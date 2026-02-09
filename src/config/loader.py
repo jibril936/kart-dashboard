@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict
 import os
@@ -26,8 +26,8 @@ class AppConfig:
     refresh_hz: float = 10.0
     fullscreen: bool = True
     debug: bool = False
-    i2c: I2CConfig = I2CConfig()
-    logging: LoggingConfig = LoggingConfig()
+    i2c: I2CConfig = field(default_factory=I2CConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
 DEFAULT_CONFIG_PATH = Path("config/config.yaml")
