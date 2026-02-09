@@ -1,0 +1,13 @@
+# Exemple de configuration Kart Dashboard
+source: simulated  # simulated | i2c
+refresh_hz: 10
+fullscreen: true
+debug: false
+
+i2c:
+  bus: 1
+  address: 16  # 0x10 en décimal
+
+logging:
+  enabled: false
+  path: logs/telemetry.csv
