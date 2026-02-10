@@ -4,15 +4,13 @@ import logging
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QThread
-from PyQt6.QtWidgets import QApplication
-
 from src.config.loader import AppConfig, load_config
 from src.data.logger import TelemetryLogger
 from src.data.sources import DataSource, I2CDataSource, SimulatedDataSource
 from src.data.worker import DataWorker
 from src.models.telemetry import Telemetry
 from src.models.telemetry_model import TelemetryModel
+from src.qt_compat import QApplication, QThread
 from src.ui.dashboard import DashboardWindow
 
 
@@ -25,7 +23,13 @@ def setup_logging() -> None:
 
 def build_source(config: AppConfig) -> DataSource:
     if config.source == "i2c":
-        return I2CDataSource(bus=config.i2c.bus, address=config.i2c.address)
+        i2c_source = I2CDataSource(bus=config.i2c.bus, address=config.i2c.address)
+        if not i2c_source.is_available:
+            logging.getLogger(__name__).warning("I2C unavailable, falling back to simulated source")
+            simulated = SimulatedDataSource()
+            simulated.inject_startup_alert("I2C indisponible: fallback en mode simulated")
+            return simulated
+        return i2c_source
     return SimulatedDataSource()
 
 

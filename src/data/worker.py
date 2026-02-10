@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from src.qt_compat import QObject, QTimer, pyqtSignal
 
 from src.data.sources.base import DataSource
 from src.models.telemetry import Telemetry
