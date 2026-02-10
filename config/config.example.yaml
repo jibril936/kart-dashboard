@@ -1,12 +1,18 @@
-# Exemple de configuration Kart Dashboard
-source: simulated  # simulated | i2c
-refresh_hz: 10
+# Example configuration for kart dashboard
+source: simulated   # simulated | i2c
+refresh_hz: 20
 fullscreen: true
 debug: false
 
 i2c:
   bus: 1
-  address: 16  # 0x10 en décimal
+  address: 16 # 0x10
+
+alerts:
+  low_soc_percent: 20
+  high_motor_temp_c: 95
+  high_inverter_temp_c: 85
+  high_battery_temp_c: 60
 
 logging:
   enabled: false
