@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections import deque
 
-import pyqtgraph as pg
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
-
 from src.models.telemetry import Telemetry
+from src.qt_compat import QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, pyqtSignal
+
+try:  # pragma: no cover - optional dependency
+    import pyqtgraph as pg
+except Exception:  # pragma: no cover - optional dependency
+    pg = None
 
 
 class DiagView(QWidget):
@@ -49,16 +51,26 @@ class DiagView(QWidget):
             grid.addWidget(title, idx, 0)
             grid.addWidget(label, idx, 1)
 
-        self._plot = pg.PlotWidget(background="#0b0f1a")
-        self._plot.setLabel("left", "Value")
-        self._plot.setLabel("bottom", "Time", units="s")
-        self._plot.showGrid(x=True, y=True, alpha=0.25)
-        self._speed_curve = self._plot.plot(pen=pg.mkPen("#60A5FA", width=3), name="speed")
-        self._power_curve = self._plot.plot(pen=pg.mkPen("#F97316", width=2), name="power")
+        self._plot = None
+        self._speed_curve = None
+        self._power_curve = None
+
+        if pg is not None:
+            self._plot = pg.PlotWidget(background="#0b0f1a")
+            self._plot.setLabel("left", "Value")
+            self._plot.setLabel("bottom", "Time", units="s")
+            self._plot.showGrid(x=True, y=True, alpha=0.25)
+            self._speed_curve = self._plot.plot(pen=pg.mkPen("#60A5FA", width=3), name="speed")
+            self._power_curve = self._plot.plot(pen=pg.mkPen("#F97316", width=2), name="power")
+            graph_widget = self._plot
+        else:
+            placeholder = QLabel("pyqtgraph indisponible: graphiques désactivés")
+            placeholder.setStyleSheet("font-size: 24px; color:#9CA3AF; padding: 20px;")
+            graph_widget = placeholder
 
         root.addLayout(top)
         root.addLayout(grid)
-        root.addWidget(self._plot, stretch=1)
+        root.addWidget(graph_widget, stretch=1)
 
     def update_telemetry(self, telemetry: Telemetry) -> None:
         self._raw_values["Voltage"].setText(Telemetry.format_value(telemetry.pack_voltage_v, "V", 2))
@@ -68,6 +80,9 @@ class DiagView(QWidget):
         self._raw_values["Throttle"].setText(Telemetry.format_value(telemetry.throttle_percent, "%", 0))
         self._raw_values["Brake"].setText(Telemetry.format_value(telemetry.brake_percent, "%", 0))
         self._raw_values["Source"].setText(telemetry.source_state.value)
+
+        if self._speed_curve is None or self._power_curve is None:
+            return
 
         if telemetry.speed_kph is not None and telemetry.pack_power_kw is not None:
             self._sample_index += 1

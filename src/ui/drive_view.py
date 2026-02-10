@@ -1,8 +1,18 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from src.qt_compat import (
+    ALIGN_CENTER,
+    FONT_BOLD,
+    QFont,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    pyqtSignal,
+)
 
 from src.models.telemetry import SourceState, Telemetry
 
@@ -18,7 +28,7 @@ class DriveView(QWidget):
 
         top = QHBoxLayout()
         self._state = QLabel("SOURCE: —")
-        self._state.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        self._state.setFont(QFont("Arial", 18, FONT_BOLD))
 
         diag_button = QPushButton("⚙️ Diagnostic")
         diag_button.setMinimumHeight(56)
@@ -30,12 +40,12 @@ class DriveView(QWidget):
         top.addWidget(diag_button)
 
         self._speed = QLabel("—")
-        self._speed.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._speed.setFont(QFont("Arial", 120, QFont.Weight.Bold))
+        self._speed.setAlignment(ALIGN_CENTER)
+        self._speed.setFont(QFont("Arial", 120, FONT_BOLD))
 
         self._soc = QLabel("SOC —")
-        self._soc.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._soc.setFont(QFont("Arial", 54, QFont.Weight.Bold))
+        self._soc.setAlignment(ALIGN_CENTER)
+        self._soc.setFont(QFont("Arial", 54, FONT_BOLD))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(20)

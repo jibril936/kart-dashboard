@@ -16,6 +16,10 @@ class SimulatedDataSource(DataSource):
         self._start = time.monotonic()
         self._soc = 96.0
         self._last_t = self._start
+        self._startup_alert: str | None = None
+
+    def inject_startup_alert(self, message: str) -> None:
+        self._startup_alert = message
 
     def read(self) -> Telemetry:
         now = time.monotonic()
@@ -39,6 +43,11 @@ class SimulatedDataSource(DataSource):
         motor_temp = 45 + 0.13 * max(current, 0) + 7 * math.sin(elapsed / 18) + random.uniform(-0.8, 0.8)
         inverter_temp = 40 + 0.1 * max(current, 0) + 5 * math.sin(elapsed / 20) + random.uniform(-0.8, 0.8)
 
+        alerts: list[str] = []
+        if self._startup_alert:
+            alerts.append(self._startup_alert)
+            self._startup_alert = None
+
         return Telemetry(
             timestamp=datetime.utcnow(),
             speed_kph=speed,
@@ -53,4 +62,5 @@ class SimulatedDataSource(DataSource):
             throttle_percent=throttle,
             brake_percent=brake,
             source_state=SourceState.OK,
+            alerts=alerts,
         )

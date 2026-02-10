@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from src.qt_compat import QObject, pyqtSignal
 
 from src.config.loader import AlertThresholds
 from src.models.telemetry import SourceState, Telemetry

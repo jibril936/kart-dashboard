@@ -22,6 +22,10 @@ class I2CDataSource(DataSource):
         self._bus: Optional[SMBus] = None
         self._logger = logging.getLogger(__name__)
 
+    @property
+    def is_available(self) -> bool:
+        return SMBus is not None
+
     def start(self) -> None:
         if SMBus is None:
             self._logger.warning("smbus2 not installed; I2CDataSource running in stub mode")

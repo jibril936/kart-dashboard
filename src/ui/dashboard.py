@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget
+from src.qt_compat import QMainWindow, QStackedWidget
 
 from src.models.telemetry import Telemetry
 from src.ui.diag_view import DiagView
