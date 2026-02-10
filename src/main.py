@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import logging
 import sys
 from pathlib import Path
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QThread
+from PyQt6.QtWidgets import QApplication
 
 from src.config.loader import AppConfig, load_config
 from src.data.logger import TelemetryLogger
-from src.data.sources.i2c import I2CSource
-from src.data.sources.simulated import SimulatedSource
+from src.data.sources import DataSource, I2CDataSource, SimulatedDataSource
 from src.data.worker import DataWorker
+from src.models.telemetry import Telemetry
+from src.models.telemetry_model import TelemetryModel
 from src.ui.dashboard import DashboardWindow
 
 
@@ -20,10 +23,10 @@ def setup_logging() -> None:
     )
 
 
-def build_source(config: AppConfig):
+def build_source(config: AppConfig) -> DataSource:
     if config.source == "i2c":
-        return I2CSource(bus=config.i2c.bus, address=config.i2c.address)
-    return SimulatedSource()
+        return I2CDataSource(bus=config.i2c.bus, address=config.i2c.address)
+    return SimulatedDataSource()
 
 
 def main() -> int:
@@ -41,29 +44,32 @@ def main() -> int:
 
     source = build_source(config)
     worker = DataWorker(source, refresh_hz=config.refresh_hz)
-    thread = QThread()
-    worker.moveToThread(thread)
+    worker_thread = QThread()
+    worker.moveToThread(worker_thread)
 
-    logger = None
-    if config.logging.enabled:
-        logger = TelemetryLogger(Path(config.logging.path))
+    telemetry_model = TelemetryModel(config.alerts)
 
-    def handle_telemetry(telemetry):
+    logger = TelemetryLogger(Path(config.logging.path)) if config.logging.enabled else None
+
+    def on_telemetry(telemetry: Telemetry) -> None:
         window.update_telemetry(telemetry)
         if logger:
             logger.log(telemetry)
 
-    worker.telemetry_received.connect(handle_telemetry)
-    thread.started.connect(worker.start)
-    thread.start()
+    worker.telemetry_received.connect(telemetry_model.process)
+    telemetry_model.telemetry_updated.connect(on_telemetry)
+
+    worker_thread.started.connect(worker.start)
+    worker_thread.start()
 
     exit_code = app.exec()
 
     worker.stop()
-    thread.quit()
-    thread.wait()
+    worker_thread.quit()
+    worker_thread.wait()
     if logger:
         logger.close()
+
     return exit_code
 
 

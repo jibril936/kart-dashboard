@@ -5,73 +5,50 @@ from datetime import datetime
 from typing import Optional
 
 from src.data.sources.base import DataSource
-from src.models.telemetry import Telemetry
+from src.models.telemetry import SourceState, Telemetry
 
 try:
     from smbus2 import SMBus  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
+except Exception:  # pragma: no cover
     SMBus = None  # type: ignore
 
 
-class I2CSource(DataSource):
-    """Stub I2C prêt à être complété quand le protocole est défini."""
+class I2CDataSource(DataSource):
+    """I2C scaffold. Parsing/protocol can be added without touching UI."""
 
-    def __init__(self, bus: int, address: int, reconnect_delay_s: float = 2.0) -> None:
+    def __init__(self, bus: int, address: int) -> None:
         self._bus_id = bus
         self._address = address
         self._bus: Optional[SMBus] = None
-        self._reconnect_delay_s = reconnect_delay_s
         self._logger = logging.getLogger(__name__)
-        self._available = SMBus is not None
-        if not self._available:
-            self._logger.warning("smbus2 indisponible, I2CSource en mode dégradé")
 
-    def _connect(self) -> None:
-        if not self._available:
+    def start(self) -> None:
+        if SMBus is None:
+            self._logger.warning("smbus2 not installed; I2CDataSource running in stub mode")
             return
         if self._bus is None:
             self._bus = SMBus(self._bus_id)
-            self._logger.info("Connexion I2C ouverte (bus=%s, address=0x%X)", self._bus_id, self._address)
+
+    def stop(self) -> None:
+        if self._bus is not None:
+            self._bus.close()
+            self._bus = None
 
     def read(self) -> Telemetry:
-        if not self._available:
-            return Telemetry(
-                timestamp=datetime.utcnow(),
-                speed_kph=None,
-                rpm=None,
-                temp_c=None,
-                battery_v=None,
-                status="ALERTE",
-            )
-        try:
-            self._connect()
-            # TODO: implémenter le protocole capteur quand il sera défini.
-            # Exemple de lecture brute (à adapter):
-            # raw = self._bus.read_i2c_block_data(self._address, 0x00, 6)
-            # Parse raw -> telemetry
-            return Telemetry(
-                timestamp=datetime.utcnow(),
-                speed_kph=None,
-                rpm=None,
-                temp_c=None,
-                battery_v=None,
-                status="ALERTE",
-            )
-        except Exception as exc:  # pragma: no cover - dépend du matériel
-            self._logger.error("Erreur I2C: %s", exc)
-            self.close()
-            return Telemetry(
-                timestamp=datetime.utcnow(),
-                speed_kph=None,
-                rpm=None,
-                temp_c=None,
-                battery_v=None,
-                status="ALERTE",
-            )
+        if SMBus is None:
+            return Telemetry(timestamp=datetime.utcnow(), source_state=SourceState.ERROR, alerts=["I2C unavailable: install smbus2"])
 
-    def close(self) -> None:
-        if self._bus is not None:
-            try:
-                self._bus.close()
-            finally:
-                self._bus = None
+        try:
+            if self._bus is None:
+                self.start()
+            # TODO: replace with actual register protocol decoding.
+            # raw = self._bus.read_i2c_block_data(self._address, 0x00, 16)
+            return Telemetry(
+                timestamp=datetime.utcnow(),
+                source_state=SourceState.TIMEOUT,
+                alerts=[f"I2C stub active @ 0x{self._address:02X}", "Protocol parser not implemented"],
+            )
+        except Exception as exc:  # pragma: no cover
+            self._logger.exception("I2C read failed: %s", exc)
+            self.stop()
+            return Telemetry(timestamp=datetime.utcnow(), source_state=SourceState.ERROR, alerts=[str(exc)])
