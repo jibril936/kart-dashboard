@@ -6,3 +6,12 @@ __pycache__/
 build*/
 CMakeFiles/
 CMakeCache.txt
+# Qt Creator / local IDE files
+*.creator
+*.files
+*.includes
+*.config
+*.cflags
+*.cxxflags
+*.user
+*.user.*
