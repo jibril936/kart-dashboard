@@ -1,58 +1,26 @@
-# Kart Dashboard – EV Cluster Preview
+# Kart Dashboard — TECH MVP (PyQt6)
 
-Refonte orientée "instrument cluster" avec deux écrans :
+Application desktop PyQt6 pour afficher les **informations techniques véhicule**.
 
-- **Drive / Conduite** (minimal, lisible à distance)
-- **Details / Pit** (graphes + historique alertes + stats)
-
-## Inspirations design
-
-- Audi Virtual Cockpit (speed + power/recup + warnings)
-- Porsche Taycan (mode "Pure" minimal)
-- Tesla Model 3 (hiérarchie simple)
-
-## Architecture
-
-```text
-src/
-  core/
-    types.py        # modèles d'état + alertes
-    alerts.py       # règles d'alertes (INFO/WARNING/CRITICAL)
-    store.py        # StateStore (single source of truth)
-  services/
-    base.py         # DataService injectable
-    fake.py         # FakeDataService + scénarios demo
-    poller.py       # acquisition data (QThread + QTimer)
-  ui/
-    components/     # widgets réutilisables (gauge, batterie, alertes, etc.)
-    drive_screen.py
-    details_screen.py
-    main_window.py
-    theme.py
-  config/loader.py
-  main.py
-```
-
-## Scénarios demo
+## Setup (conda)
 
 ```bash
-./run.sh --demo --scenario normal
-./run.sh --demo --scenario acceleration
-./run.sh --demo --scenario battery_drop
-./run.sh --demo --scenario overheat
-./run.sh --demo --scenario sensor_ko
+conda create -n kart-tech python=3.12 -y
+conda activate kart-tech
+pip install -r requirements.txt
 ```
 
-## Debug / logging
+## Lancement demo
 
 ```bash
-KART_LOG_LEVEL=DEBUG ./run.sh --demo
-DEBUG=1 ./run.sh
+python -m src.main --demo --scenario normal
 ```
 
-## Notes performance
+Scénarios prévus (MVP):
 
-- Pas de re-création de widgets au tick
-- StateStore unique + signal `state_changed`
-- Lissage léger sur l'aiguille RPM
-- Graphes pyqtgraph activés si installés, fallback sinon
+- `normal`
+- `battery_drop`
+- `overheat`
+- `sensor_ko`
+
+> Étape 1 livrée: socle app + écran TECH + fake data normal.
