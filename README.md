@@ -1,26 +1,29 @@
-# Kart Dashboard — TECH MVP (PyQt6)
+# Kart Dashboard — Cluster + TECH (PyQt6)
 
-Application desktop PyQt6 pour afficher les **informations techniques véhicule**.
+Application desktop PyQt6 avec deux pages:
 
-## Setup (conda)
+- **CLUSTER / CONDUITE** (style tableau de bord)
+- **TECH / DIAGNOSTICS** (télémétrie détaillée + alert center)
+
+## Setup
 
 ```bash
-conda create -n kart-tech python=3.12 -y
-conda activate kart-tech
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Lancement demo
 
 ```bash
-python -m src.main --demo --scenario normal
+python src/main.py --demo --scenario normal
+python src/main.py --demo --scenario battery_drop
+python src/main.py --demo --scenario overheat
 ```
 
-Scénarios prévus (MVP):
+Scénarios disponibles:
 
 - `normal`
 - `battery_drop`
 - `overheat`
 - `sensor_ko`
-
-> Étape 1 livrée: socle app + écran TECH + fake data normal.
