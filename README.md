@@ -1,144 +1,58 @@
-# Kart Dashboard EV (Raspberry Pi)
+# Kart Dashboard – EV Cluster Preview
 
-Dashboard tactile pour kart électrique (Python + Qt), pensé pour un écran unique en conduite.
+Refonte orientée "instrument cluster" avec deux écrans :
 
-Architecture: `DataSource -> TelemetryModel -> UI`.
+- **Drive / Conduite** (minimal, lisible à distance)
+- **Details / Pit** (graphes + historique alertes + stats)
 
-- Source télémétrie interchangeable (`simulated`, `i2c`, puis CAN/UART/UDP plus tard)
-- UI découplée de la source matérielle
-- Compatibilité **PyQt5 et PyQt6** via couche `src/qt_compat.py`
-- `pyqtgraph` optionnel (fallback placeholder si non installé)
-- Si I2C indisponible: fallback automatique en simulated + message clair
+## Inspirations design
 
-## Wireframe (texte)
+- Audi Virtual Cockpit (speed + power/recup + warnings)
+- Porsche Taycan (mode "Pure" minimal)
+- Tesla Model 3 (hiérarchie simple)
 
-### 1) Mode Conduite (principal)
-
-```text
-┌───────────────────────────────────────────────────────────────────────┐
-│ SOURCE: OK/ERROR                                    [⚙ Diagnostic]   │
-│                                                                       │
-│                          72 km/h                                      │
-│                                                                       │
-│                      SOC 84 %                                         │
-│                                                                       │
-│  ┌──────────────────────┐   ┌──────────────────────┐                 │
-│  │ Power                │   │ Current              │                 │
-│  │ +12.4 kW / -regen    │   │ 54.2 A               │                 │
-│  └──────────────────────┘   └──────────────────────┘                 │
-│  ┌──────────────────────┐   ┌──────────────────────┐                 │
-│  │ Températures         │   │ Alertes              │                 │
-│  │ M 65 | I 54 | B 38   │   │ Surchauffe / capteur │                 │
-│  └──────────────────────┘   └──────────────────────┘                 │
-└───────────────────────────────────────────────────────────────────────┘
-```
-
-### 2) Mode Diagnostic (secondaire)
-
-```text
-┌───────────────────────────────────────────────────────────────────────┐
-│ [⬅ Back]                                                              │
-│                                                                       │
-│ Voltage: 51.2V   Current: 43A   Power: 2.2kW   RPM: 5320             │
-│ Throttle: 30%    Brake: 0%      Source: OK                           │
-│                                                                       │
-│ [Graphes pyqtgraph si dispo]                                          │
-│ (sinon: placeholder "graphiques désactivés")                         │
-└───────────────────────────────────────────────────────────────────────┘
-```
-
-## Thème UI recommandé
-
-- **Dark mode** (`#0b0f1a`) pour limiter l’éblouissement
-- Contraste élevé texte principal (`#F9FAFB`) / secondaire (`#9CA3AF`)
-- Chiffres critiques en très gros (vitesse/SOC)
-- Icônes + couleurs statut source/alertes (vert/orange/rouge)
-- Interactions courtes et peu profondes (Drive ⇄ Diag)
-
-## Structure code
+## Architecture
 
 ```text
 src/
-  config/
-    loader.py              # AppConfig + YAML
-  data/
-    worker.py              # polling async Qt (QThread + QTimer)
-    logger.py              # export CSV optionnel
-    sources/
-      base.py              # interface DataSource
-      simulated.py         # SimulatedDataSource
-      i2c.py               # I2CDataSource + disponibilité
-  models/
-    telemetry.py           # modèle Telemetry unique
-    telemetry_model.py     # règles alertes
+  core/
+    types.py        # modèles d'état + alertes
+    alerts.py       # règles d'alertes (INFO/WARNING/CRITICAL)
+    store.py        # StateStore (single source of truth)
+  services/
+    base.py         # DataService injectable
+    fake.py         # FakeDataService + scénarios demo
+    poller.py       # acquisition data (QThread + QTimer)
   ui/
-    dashboard.py           # navigation Drive/Diag
-    drive_view.py          # vue conduite
-    diag_view.py           # vue diagnostic + graphes optionnels
-  qt_compat.py             # abstraction PyQt5/PyQt6
+    components/     # widgets réutilisables (gauge, batterie, alertes, etc.)
+    drive_screen.py
+    details_screen.py
+    main_window.py
+    theme.py
+  config/loader.py
   main.py
 ```
 
-### Ajouter une nouvelle source (CAN/UART/UDP/log)
-
-1. Créer une classe implémentant `DataSource` (`start/stop/read`).
-2. Ajouter le mapping dans `build_source()` (`src/main.py`).
-3. Retourner des `Telemetry` cohérents (l’UI reste inchangée).
-
-## Installation
+## Scénarios demo
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip wheel
-python -m pip install -r requirements.txt
+./run.sh --demo --scenario normal
+./run.sh --demo --scenario acceleration
+./run.sh --demo --scenario battery_drop
+./run.sh --demo --scenario overheat
+./run.sh --demo --scenario sensor_ko
 ```
 
-Puis installer **une stack Qt**:
+## Debug / logging
 
 ```bash
-# Option A (souvent plus simple sur Raspberry Pi)
-python -m pip install PyQt5
-
-# Option B
-python -m pip install PyQt6
-```
-
-Optionnel:
-
-```bash
-python -m pip install pyqtgraph smbus2
-```
-
-## Configuration
-
-```bash
-cp config/config.example.yaml config/config.yaml
-```
-
-Exemple:
-
-- `source`: `simulated` ou `i2c`
-- `refresh_hz`: ex. `20`
-- `fullscreen`: `true`
-- `debug`: `false`
-
-Si config absente: defaults automatiques.
-
-## Run
-
-```bash
-./run.sh
-```
-
-Mode debug:
-
-```bash
+KART_LOG_LEVEL=DEBUG ./run.sh --demo
 DEBUG=1 ./run.sh
 ```
 
-## Plan d’itération
+## Notes performance
 
-- **MVP**: vue conduite lisible, simulated, alertes basiques, diag brut
-- **V1**: intégration capteurs I2C/CAN, logs exportables, mini-trip
-- **V2**: widgets EV avancés (power/regen meter dédié, SOC/range enrichi), historique événements, tuning UX conduite
+- Pas de re-création de widgets au tick
+- StateStore unique + signal `state_changed`
+- Lissage léger sur l'aiguille RPM
+- Graphes pyqtgraph activés si installés, fallback sinon

@@ -1,79 +1,81 @@
 from __future__ import annotations
 
+import argparse
 import logging
+import os
 import sys
-from pathlib import Path
 
-from src.config.loader import AppConfig, load_config
-from src.data.logger import TelemetryLogger
-from src.data.sources import DataSource, I2CDataSource, SimulatedDataSource
-from src.data.worker import DataWorker
-from src.models.telemetry import Telemetry
-from src.models.telemetry_model import TelemetryModel
+from src.config.loader import load_config
+from src.core.alerts import AlertEngine
+from src.core.store import StateStore, default_state
 from src.qt_compat import QApplication, QThread
-from src.ui.dashboard import DashboardWindow
+from src.services.fake import FakeDataService
+from src.services.poller import DataPoller
+from src.ui.details_screen import DetailsScreen
+from src.ui.main_window import MainWindow
+from src.ui.theme import build_stylesheet
 
 
 def setup_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    level = os.environ.get("KART_LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(level=level, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Kart dashboard")
+    parser.add_argument("--demo", action="store_true", help="Force fake demo data")
+    parser.add_argument(
+        "--scenario",
+        choices=["normal", "acceleration", "battery_drop", "overheat", "sensor_ko"],
+        help="Demo scenario",
     )
-
-
-def build_source(config: AppConfig) -> DataSource:
-    if config.source == "i2c":
-        i2c_source = I2CDataSource(bus=config.i2c.bus, address=config.i2c.address)
-        if not i2c_source.is_available:
-            logging.getLogger(__name__).warning("I2C unavailable, falling back to simulated source")
-            simulated = SimulatedDataSource()
-            simulated.inject_startup_alert("I2C indisponible: fallback en mode simulated")
-            return simulated
-        return i2c_source
-    return SimulatedDataSource()
+    return parser.parse_args()
 
 
 def main() -> int:
     setup_logging()
+    args = parse_args()
     config = load_config()
 
+    if args.demo:
+        config.source = "demo"
+    if args.scenario:
+        config.demo_scenario = args.scenario
+
     app = QApplication(sys.argv)
-    window = DashboardWindow(refresh_hz=config.refresh_hz)
+    app.setStyleSheet(build_stylesheet())
+
+    store = StateStore(default_state())
+    alerts = AlertEngine(config)
+    details = DetailsScreen(store)
+    window = MainWindow(config, details)
 
     if config.fullscreen and not config.debug:
         window.showFullScreen()
     else:
-        window.resize(1280, 720)
+        window.resize(1440, 860)
         window.show()
 
-    source = build_source(config)
-    worker = DataWorker(source, refresh_hz=config.refresh_hz)
-    worker_thread = QThread()
-    worker.moveToThread(worker_thread)
+    service = FakeDataService(scenario=config.demo_scenario)
 
-    telemetry_model = TelemetryModel(config.alerts)
+    poller = DataPoller(service, data_hz=config.data_hz)
+    thread = QThread()
+    poller.moveToThread(thread)
 
-    logger = TelemetryLogger(Path(config.logging.path)) if config.logging.enabled else None
+    def on_sample(sample: object, stale_ms: int) -> None:
+        state = alerts.evaluate(sample, stale_ms, store.state.alert_history)
+        store.update(state)
 
-    def on_telemetry(telemetry: Telemetry) -> None:
-        window.update_telemetry(telemetry)
-        if logger:
-            logger.log(telemetry)
+    poller.sample_ready.connect(on_sample)
+    store.state_changed.connect(window.render)
 
-    worker.telemetry_received.connect(telemetry_model.process)
-    telemetry_model.telemetry_updated.connect(on_telemetry)
-
-    worker_thread.started.connect(worker.start)
-    worker_thread.start()
+    thread.started.connect(poller.start)
+    thread.start()
 
     exit_code = app.exec()
-
-    worker.stop()
-    worker_thread.quit()
-    worker_thread.wait()
-    if logger:
-        logger.close()
-
+    poller.stop()
+    thread.quit()
+    thread.wait()
     return exit_code
 
 
