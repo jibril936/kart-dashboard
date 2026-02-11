@@ -48,6 +48,7 @@ class CircularGauge(QWidget):
 
         rect = self.rect().adjusted(18, 18, -18, -18)
         center = rect.center()
+        center_f = QPointF(center)
         radius = min(rect.width(), rect.height()) / 2
         arc_rect = rect.adjusted(16, 16, -16, -16)
 
@@ -79,18 +80,18 @@ class CircularGauge(QWidget):
             ang = math.radians(start_deg - (span_deg * i / 10))
             r1 = radius * 0.75
             r2 = radius * 0.84
-            p1 = QPointF(center.x() + math.cos(ang) * r1, center.y() - math.sin(ang) * r1)
-            p2 = QPointF(center.x() + math.cos(ang) * r2, center.y() - math.sin(ang) * r2)
+            p1 = QPointF(center_f.x() + math.cos(ang) * r1, center_f.y() - math.sin(ang) * r1)
+            p2 = QPointF(center_f.x() + math.cos(ang) * r2, center_f.y() - math.sin(ang) * r2)
             painter.drawLine(p1, p2)
 
         pointer_deg = start_deg - value_span
         pointer_rad = math.radians(pointer_deg)
         pointer_end = QPointF(
-            center.x() + math.cos(pointer_rad) * radius * 0.67,
-            center.y() - math.sin(pointer_rad) * radius * 0.67,
+            center_f.x() + math.cos(pointer_rad) * radius * 0.67,
+            center_f.y() - math.sin(pointer_rad) * radius * 0.67,
         )
         painter.setPen(QPen(QColor("#dbe7f4"), 3))
-        painter.drawLine(center, pointer_end)
+        painter.drawLine(center_f, pointer_end)
         painter.setBrush(QColor("#dbe7f4"))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(center, 6, 6)
