@@ -138,7 +138,7 @@ class DriveScreen(QWidget):
 
         controls = QHBoxLayout()
         controls.addStretch(1)
-        btn = QPushButton("Details / Pit")
+        btn = QPushButton("TECH / Diagnostics")
         btn.setProperty("secondary", True)
         btn.setMinimumHeight(38)
         btn.clicked.connect(self.details_requested.emit)
