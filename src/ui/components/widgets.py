@@ -65,6 +65,58 @@ class GaugeNeedle(QWidget):
         return 30 + ratio * 120
 
 
+class DialContainer(QFrame):
+    def __init__(self, title: str | None = None) -> None:
+        super().__init__()
+        self.setProperty("dial", True)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 18, 24, 18)
+        layout.setSpacing(10)
+        self._title = QLabel(title or "")
+        self._title.setProperty("kpi", True)
+        self._title.setAlignment(ALIGN_CENTER)
+        self._title.setVisible(bool(title))
+        layout.addWidget(self._title)
+        self._body = QVBoxLayout()
+        self._body.setSpacing(6)
+        layout.addLayout(self._body, 1)
+
+    def set_title(self, title: str) -> None:
+        self._title.setText(title)
+        self._title.setVisible(bool(title))
+
+    def body_layout(self) -> QVBoxLayout:
+        return self._body
+
+
+class ClusterTile(QFrame):
+    def __init__(self, title: str, unit: str) -> None:
+        super().__init__()
+        self.setProperty("clusterTile", True)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(2)
+
+        self._title = QLabel(title)
+        self._title.setProperty("kpi", True)
+        self._title.setAlignment(ALIGN_CENTER)
+
+        self._value = QLabel("--")
+        self._value.setProperty("tileValue", True)
+        self._value.setAlignment(ALIGN_CENTER)
+
+        self._unit = QLabel(unit)
+        self._unit.setProperty("tileUnit", True)
+        self._unit.setAlignment(ALIGN_CENTER)
+
+        layout.addWidget(self._title)
+        layout.addWidget(self._value)
+        layout.addWidget(self._unit)
+
+    def set_value(self, text: str) -> None:
+        self._value.setText(text)
+
+
 class BatteryWidget(QFrame):
     def __init__(self) -> None:
         super().__init__()
