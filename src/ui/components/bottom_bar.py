@@ -7,7 +7,7 @@ from src.ui.visibility import set_visible_if, value_is_present
 
 
 class BottomBar(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, show_charge_station: bool = True) -> None:
         super().__init__(parent)
         self.setMinimumHeight(88)
 
@@ -16,13 +16,14 @@ class BottomBar(QWidget):
         layout.setSpacing(12)
 
         self.battery_widget = BatteryStatusWidget()
-        self.charge_station_widget = ValueStatusWidget("CHARGE STATION", "A")
+        self.charge_station_widget = ValueStatusWidget("CHARGE STATION", "A") if show_charge_station else None
         self.steering_widget = ValueStatusWidget("STEERING", "deg")
         self.temperature_widget = TemperatureStatusWidget()
         self.brake_widget = ValueStatusWidget("BRAKE", "%")
 
         layout.addWidget(self.battery_widget, 2)
-        layout.addWidget(self.charge_station_widget, 2)
+        if self.charge_station_widget is not None:
+            layout.addWidget(self.charge_station_widget, 2)
         layout.addWidget(self.steering_widget, 2)
         layout.addWidget(self.temperature_widget, 2)
         layout.addWidget(self.brake_widget, 2)
@@ -43,7 +44,7 @@ class BottomBar(QWidget):
             self.battery_widget.setValue(float(battery_percent), float(battery_voltage))
 
         has_charge_station = bool(charging_state) and value_is_present(station_current_a)
-        if set_visible_if(self.charge_station_widget, has_charge_station):
+        if self.charge_station_widget is not None and set_visible_if(self.charge_station_widget, has_charge_station):
             self.charge_station_widget.setValue(float(station_current_a))
 
         if set_visible_if(self.steering_widget, value_is_present(steering_angle_deg)):

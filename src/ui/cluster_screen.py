@@ -74,7 +74,7 @@ class ClusterScreen(QWidget):
         middle.addWidget(self.rpm_gauge, 1)
         root.addLayout(middle, 1)
 
-        self.bottom_bar = BottomBar()
+        self.bottom_bar = BottomBar(show_charge_station=False)
         root.addWidget(self.bottom_bar)
 
         nav = QHBoxLayout()
