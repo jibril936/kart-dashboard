@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtCore import QLineF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
@@ -133,7 +133,7 @@ class TemperatureStatusWidget(QWidget):
 
         painter.setPen(QPen(QColor("#94abc2"), 1.2))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawLine(rect.left() + 16.0, rect.top() + 18.0, rect.left() + 16.0, rect.bottom() - 16.0)
+        painter.drawLine(QLineF(rect.left() + 16.0, rect.top() + 18.0, rect.left() + 16.0, rect.bottom() - 16.0))
         painter.drawEllipse(QRectF(rect.left() + 9.0, rect.bottom() - 21.0, 14.0, 14.0))
 
         gauge = QRectF(rect.left() + 30.0, rect.top() + 30.0, rect.width() - 40.0, 12.0)
