@@ -159,6 +159,41 @@ class TemperatureStatusWidget(QWidget):
         painter.drawText(QRectF(rect.left() + 30.0, rect.top() + 42.0, rect.width() - 36.0, 18.0), Qt.AlignmentFlag.AlignLeft, f"{self._value:.0f}°C")
 
 
+class ValueStatusWidget(QWidget):
+    def __init__(self, title: str, unit: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._title = title
+        self._unit = unit
+        self._value = 0.0
+        self.setMinimumSize(150, 72)
+
+    def setValue(self, value: float) -> None:  # noqa: N802
+        self._value = value
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        _ = event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = QRectF(self.rect()).adjusted(2.0, 2.0, -2.0, -2.0)
+        painter.setPen(QPen(QColor("#23354a"), 1.0))
+        painter.setBrush(QColor("#0d1522"))
+        painter.drawRoundedRect(rect, 10.0, 10.0)
+
+        painter.setPen(QColor("#9ab1c8"))
+        painter.setFont(QFont("Segoe UI", 8, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(rect.left() + 10.0, rect.top() + 10.0, rect.width() - 20.0, 14.0), Qt.AlignmentFlag.AlignLeft, self._title)
+
+        painter.setPen(QColor("#63c6a8"))
+        painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        painter.drawText(QRectF(rect.left() + 10.0, rect.top() + 24.0, rect.width() - 20.0, 24.0), Qt.AlignmentFlag.AlignLeft, f"{self._value:.0f}")
+
+        painter.setPen(QColor("#8ba2ba"))
+        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(rect.left() + 10.0, rect.top() + 50.0, rect.width() - 20.0, 14.0), Qt.AlignmentFlag.AlignLeft, self._unit)
+
+
 class MeterBarWidget(QWidget):
     def __init__(self, label: str, color: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)

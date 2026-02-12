@@ -103,9 +103,18 @@ class ClusterScreen(QWidget):
         self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "DRIVE")
 
         battery_pct = None if battery_v is None else (battery_v - 42.0) / 12.0 * 100.0
-        power_ratio = None if speed is None else min(1.0, max(0.0, speed / 120.0))
-        regen_ratio = None if brake is None else min(1.0, max(0.0, brake / 25.0))
-        self.bottom_bar.set_values(battery_v, battery_pct, power_ratio, regen_ratio, motor_temp, temperature_label="MOTOR")
+        station_current = state.station_current_A
+        brake_percent = None if brake is None else min(100.0, max(0.0, brake * 4.0))
+        self.bottom_bar.set_values(
+            battery_v,
+            battery_pct,
+            charging,
+            station_current,
+            steering_angle,
+            motor_temp,
+            brake_percent,
+            temperature_label="MOTOR",
+        )
 
         indicators = {
             "vehicle_charging": charging,
