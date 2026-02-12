@@ -41,7 +41,15 @@ class FakeDataService(DataService):
 
         self._state.motor_temp_C = 40.0 + 5.0 * (0.5 + 0.5 * math.sin(0.1 * t))
 
-        if self.scenario == "battery_drop":
+        if self.scenario == "acceleration":
+            accel = min(1.0, t / 14.0)
+            self._state.speed_kmh = min(145.0, 10.0 + 140.0 * accel + 4.0 * math.sin(0.8 * t))
+            self._state.rpm = min(7600, int(1200 + 6400 * accel + 320 * math.sin(1.1 * t)))
+            self._state.charging_state = False
+            self._state.station_current_A = 0.0
+            self._state.battery_charge_current_A = max(0.0, 4.5 - 3.5 * accel)
+            self._state.battery_voltage_V = max(46.8, 51.8 - 2.6 * accel)
+        elif self.scenario == "battery_drop":
             self._state.battery_voltage_V = 50.0 - min(6.0, 0.22 * t)
             self._state.battery_charge_current_A = max(0.0, 8.0 - 0.35 * t)
             self._state.charging_state = self._state.battery_charge_current_A > 1.0

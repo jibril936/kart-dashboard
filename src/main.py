@@ -17,7 +17,7 @@ from src.ui.theme import dark_theme_qss
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Kart dashboard — Cluster + Tech")
     parser.add_argument("--demo", action="store_true", help="Use fake data service")
-    parser.add_argument("--scenario", default="normal", choices=["normal", "battery_drop", "overheat", "sensor_ko"])
+    parser.add_argument("--scenario", default="normal", choices=["normal", "acceleration", "battery_drop", "overheat", "sensor_ko"])
     return parser.parse_args()
 
 
