@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 from src.ui.components import BottomBar, CenterPanel, CircularGauge, IndicatorRow, IndicatorSpec
-from src.ui.components.status_widgets import AbsBadgeWidget
 from src.ui.visibility import set_visible_if, value_is_present
 
 MAX_SPEED_KMH = 200
@@ -26,23 +25,19 @@ class ClusterScreen(QWidget):
 
         top_bar = QHBoxLayout()
         top_bar.setSpacing(8)
+        self.vehicle_state = QLabel("")
+        self.vehicle_state.setObjectName("TopStatusState")
         self.indicators = IndicatorRow(
             [
-                IndicatorSpec("battery_low", "battery", "BATT", active_color="#ffb347"),
+                IndicatorSpec("vehicle_charging", "charging", "CHG", active_color="#5ea9ff"),
                 IndicatorSpec("overheat", "temp", "TEMP", active_color="#ff6d64"),
-                IndicatorSpec("charging", "charging", "CHG", active_color="#5ea9ff"),
+                IndicatorSpec("battery_low", "battery", "BATT", active_color="#ffb347"),
                 IndicatorSpec("brake", "brake", "BRAKE", active_color="#ff6d64"),
-                IndicatorSpec("steering", "steer", "STEER", active_color="#ffb347"),
-                IndicatorSpec("station", "station", "EVSE", active_color="#6da8ff"),
-                IndicatorSpec("rpm_high", "rpm", "RPM", active_color="#ffb347"),
-                IndicatorSpec("speed_high", "speed", "SPEED", active_color="#ffb347"),
-                IndicatorSpec("sensor", "sensor", "SENS", active_color="#ff6d64"),
-                IndicatorSpec("ready", "ready", "READY", active_color="#63c6a8"),
+                IndicatorSpec("abs_fault", "abs", "ABS", active_color="#ff8f66"),
             ]
         )
-        self.abs_badge = AbsBadgeWidget()
+        top_bar.addWidget(self.vehicle_state, 0)
         top_bar.addWidget(self.indicators, 1)
-        top_bar.addWidget(self.abs_badge, 0)
         root.addLayout(top_bar)
 
         middle = QHBoxLayout()
@@ -101,7 +96,11 @@ class ClusterScreen(QWidget):
 
         self.speed_gauge.set_value(float(speed) if speed is not None else 0.0)
         self.rpm_gauge.set_value(float(rpm) if rpm is not None else 0.0)
-        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "SPORT")
+
+        if set_visible_if(self.vehicle_state, value_is_present(charging)):
+            self.vehicle_state.setText("CHARGE" if charging else "DRIVE")
+
+        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "DRIVE")
 
         battery_pct = None if battery_v is None else (battery_v - 42.0) / 12.0 * 100.0
         power_ratio = None if speed is None else min(1.0, max(0.0, speed / 120.0))
@@ -109,18 +108,10 @@ class ClusterScreen(QWidget):
         self.bottom_bar.set_values(battery_v, battery_pct, power_ratio, regen_ratio, motor_temp, temperature_label="MOTOR")
 
         indicators = {
-            "battery_low": None if battery_v is None else battery_v < 48,
+            "vehicle_charging": charging,
             "overheat": None if motor_temp is None else motor_temp >= 85,
-            "charging": charging,
+            "battery_low": None if battery_v is None else battery_v < 48,
             "brake": None if brake is None else brake > 10,
-            "steering": None if steering_angle is None else abs(steering_angle) > 25,
-            "station": None if state.station_current_A is None else state.station_current_A > 0.1,
-            "rpm_high": None if rpm is None else rpm > 6200,
-            "speed_high": None if speed is None else speed > 110,
-            "sensor": None if state.steering_pot_voltage_V is None else state.steering_pot_voltage_V < 0.5 or state.steering_pot_voltage_V > 4.5,
-            "ready": None if (battery_v is None or motor_temp is None) else battery_v >= 48 and motor_temp < 90,
+            "abs_fault": None,
         }
         self.indicators.update_status(indicators)
-
-        if set_visible_if(self.abs_badge, value_is_present(state.abs_active)):
-            self.abs_badge.set_active(bool(state.abs_active))

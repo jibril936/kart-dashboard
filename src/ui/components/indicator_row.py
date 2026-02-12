@@ -6,6 +6,8 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
+from src.ui.visibility import set_visible_if
+
 
 @dataclass(slots=True)
 class IndicatorSpec:
@@ -112,5 +114,5 @@ class IndicatorRow(QWidget):
     def update_status(self, statuses: dict[str, bool | None]) -> None:
         for key, chip in self._chips.items():
             value = statuses.get(key)
-            chip.setVisible(value is not None)
+            set_visible_if(chip, value is not None)
             chip.set_status(bool(value))
