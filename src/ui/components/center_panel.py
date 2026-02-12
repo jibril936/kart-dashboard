@@ -10,8 +10,9 @@ class CenterPanel(QWidget):
         super().__init__(parent)
         self._steering_angle_deg = 0.0
         self._display_angle_deg = 0.0
-        self._mode = "SPORT"
-        self._gear = "D"
+        self._mode: str | None = None
+        self._gear: str | None = None
+        self._has_steering = False
         self.setMinimumSize(320, 280)
 
         self._angle_anim = QPropertyAnimation(self, b"display_angle", self)
@@ -26,10 +27,12 @@ class CenterPanel(QWidget):
 
     display_angle = pyqtProperty(float, fget=_get_display_angle, fset=_set_display_angle)
 
-    def set_state(self, steering_angle_deg: float, mode: str = "DRIVE") -> None:
-        clamped = max(-30.0, min(30.0, steering_angle_deg))
+    def set_state(self, steering_angle_deg: float | None, mode: str | None = None, gear: str | None = None) -> None:
+        clamped = 0.0 if steering_angle_deg is None else max(-30.0, min(30.0, steering_angle_deg))
         self._steering_angle_deg = clamped
         self._mode = mode
+        self._gear = gear
+        self._has_steering = steering_angle_deg is not None
         self._angle_anim.stop()
         self._angle_anim.setStartValue(self._display_angle_deg)
         self._angle_anim.setEndValue(clamped)
@@ -52,16 +55,18 @@ class CenterPanel(QWidget):
         painter.setBrush(QColor("#111d2f"))
         painter.drawRoundedRect(top_bar, 8, 8)
 
-        painter.setPen(QColor("#8ca5bf"))
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(top_bar.adjusted(12, 5, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, "MODE")
-        painter.setPen(QColor("#d9e7f5"))
-        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        painter.drawText(top_bar.adjusted(12, 0, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._mode)
+        if self._mode is not None:
+            painter.setPen(QColor("#8ca5bf"))
+            painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
+            painter.drawText(top_bar.adjusted(12, 5, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, "DRIVE MODE")
+            painter.setPen(QColor("#d9e7f5"))
+            painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            painter.drawText(top_bar.adjusted(12, 0, 0, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._mode)
 
-        painter.setPen(QColor("#89a0b9"))
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
-        painter.drawText(top_bar, Qt.AlignmentFlag.AlignCenter, "D / N / R")
+        if self._gear is not None:
+            painter.setPen(QColor("#7ab6ff"))
+            painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+            painter.drawText(top_bar.adjusted(0, 0, -14, 0), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._gear)
 
         stage = rect.adjusted(24, 78, -24, -40)
         stage_path = QPainterPath()
@@ -105,6 +110,7 @@ class CenterPanel(QWidget):
         painter.drawRoundedRect(42, 24, 10, 30, 3, 3)
         painter.restore()
 
-        painter.setPen(QColor("#d8e6f6"))
-        painter.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        painter.drawText(rect.adjusted(0, 0, 0, -8), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, f"{self._display_angle_deg:+.1f}°")
+        if self._has_steering:
+            painter.setPen(QColor("#d8e6f6"))
+            painter.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+            painter.drawText(rect.adjusted(0, 0, 0, -8), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, f"{self._display_angle_deg:+.1f}°")
