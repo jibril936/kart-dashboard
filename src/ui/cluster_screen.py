@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge, DriveTopIndicators
@@ -25,7 +25,11 @@ class ClusterScreen(QWidget):
         top_bar = QHBoxLayout()
         top_bar.setSpacing(8)
         self.top_indicators = DriveTopIndicators()
+        self.tech_button = QPushButton("TECH")
+        self.tech_button.setObjectName("NavButton")
+        self.tech_button.clicked.connect(self.tech_requested.emit)
         top_bar.addWidget(self.top_indicators)
+        top_bar.addWidget(self.tech_button)
         root.addLayout(top_bar)
 
         middle = QHBoxLayout()
@@ -74,13 +78,24 @@ class ClusterScreen(QWidget):
         brake = state.brake_state
         motor_temp = state.motor_temp_C
 
-        self.speed_gauge.set_value(float(speed) if speed is not None else 0.0)
-        self.rpm_gauge.set_value(float(rpm) if rpm is not None else 0.0)
+        self.speed_gauge.setVisible(speed is not None)
+        if speed is not None:
+            self.speed_gauge.set_value(float(speed))
 
-        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "DRIVE")
+        self.rpm_gauge.setVisible(rpm is not None)
+        if rpm is not None:
+            self.rpm_gauge.set_value(float(rpm))
+
+        drive_mode = None if charging is None else ("CHARGE" if charging else "DRIVE")
+        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else None, mode=drive_mode, gear=None)
 
         brake_active = None if brake is None else brake > 10.0
-        self.top_indicators.set_state(charging, charging, brake_active)
+        self.top_indicators.set_state(
+            battery_voltage_v=battery_v,
+            motor_temp_c=motor_temp,
+            is_charging=charging,
+            brake_active=brake_active,
+        )
 
         self.bottom_bar.set_values(
             battery_voltage=battery_v,

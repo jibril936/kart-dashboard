@@ -41,27 +41,30 @@ class DriveTopIndicators(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        self.mode_label = QLabel("")
-        self.mode_label.setStyleSheet(
-            "QLabel {"
-            "color: #d9e7f5;"
-            "font-size: 11px;"
-            "font-weight: 800;"
-            "letter-spacing: 0.8px;"
-            "padding: 2px 2px;"
-            "}"
-        )
+        self.battery_label = StateIndicator("", color="#8dc4ff")
+        self.temp_label = StateIndicator("", color="#ffc67a")
         self.charging_indicator = ChargingIndicator()
         self.brake_indicator = BrakeIndicator()
 
-        layout.addWidget(self.mode_label)
+        layout.addWidget(self.battery_label)
+        layout.addWidget(self.temp_label)
         layout.addStretch(1)
         layout.addWidget(self.charging_indicator)
         layout.addWidget(self.brake_indicator)
 
-    def set_state(self, charging_mode: bool | None, is_charging: bool | None, brake_active: bool | None) -> None:
-        if set_visible_if(self.mode_label, value_is_present(charging_mode)):
-            self.mode_label.setText("CHARGE" if charging_mode else "DRIVE")
+    def set_state(
+        self,
+        *,
+        battery_voltage_v: float | None,
+        motor_temp_c: float | None,
+        is_charging: bool | None,
+        brake_active: bool | None,
+    ) -> None:
+        if set_visible_if(self.battery_label, value_is_present(battery_voltage_v)):
+            self.battery_label.setText(f"BAT {battery_voltage_v:.1f}V")
+
+        if set_visible_if(self.temp_label, value_is_present(motor_temp_c)):
+            self.temp_label.setText(f"MTR {motor_temp_c:.0f}°C")
 
         set_visible_if(self.charging_indicator, bool(is_charging))
         set_visible_if(self.brake_indicator, bool(brake_active))

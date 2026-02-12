@@ -59,4 +59,13 @@ def dark_theme_qss() -> str:
         background: rgba(43, 62, 95, 0.96);
         border: 1px solid #6982ca;
     }
+
+    QFrame#BottomBarStrip {
+        background: rgba(7, 14, 26, 0.95);
+        border-top: 1px solid #2a4365;
+        border-bottom: 1px solid #13253e;
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+    }
     """
