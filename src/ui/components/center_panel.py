@@ -74,7 +74,7 @@ class CenterPanel(QWidget):
         stage_path.lineTo(stage.right() - 20, stage.bottom())
         stage_path.closeSubpath()
 
-        grad = QLinearGradient(stage.topLeft(), stage.bottomLeft())
+        grad = QLinearGradient(stage.topLeft().toPointF(), stage.bottomLeft().toPointF())
         grad.setColorAt(0.0, QColor("#2e4fb0"))
         grad.setColorAt(0.5, QColor("#14366c"))
         grad.setColorAt(1.0, QColor("#0a1731"))
