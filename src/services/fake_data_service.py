@@ -38,6 +38,7 @@ class FakeDataService(DataService):
         self._state.speed_kmh = base_speed
         self._state.rpm = base_rpm
         self._state.brake_state = 0.0 if random.random() > 0.96 else 18.0
+        self._state.abs_active = self._state.brake_state > 12.0
 
         self._state.motor_temp_C = 40.0 + 5.0 * (0.5 + 0.5 * math.sin(0.1 * t))
 

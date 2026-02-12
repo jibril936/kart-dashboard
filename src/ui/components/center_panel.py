@@ -12,7 +12,6 @@ class CenterPanel(QWidget):
         self._display_angle_deg = 0.0
         self._mode = "SPORT"
         self._gear = "D"
-        self._radio = "FM 101.5"
         self.setMinimumSize(320, 280)
 
         self._angle_anim = QPropertyAnimation(self, b"display_angle", self)
@@ -63,8 +62,6 @@ class CenterPanel(QWidget):
         painter.setPen(QColor("#89a0b9"))
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
         painter.drawText(top_bar, Qt.AlignmentFlag.AlignCenter, "D / N / R")
-        painter.setPen(QColor("#7f95ae"))
-        painter.drawText(top_bar.adjusted(0, 0, -12, 0), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"RADIO {self._radio}")
 
         stage = rect.adjusted(24, 78, -24, -40)
         stage_path = QPainterPath()
