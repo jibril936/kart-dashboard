@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
@@ -38,9 +38,10 @@ class IndicatorGlyph(QWidget):
         cx = self.width() / 2
         cy = self.height() / 2
         kind = self.spec.icon
+        # PyQt6 overload resolution is strict: float geometry must use QRectF (or explicit int args).
 
         if kind == "battery":
-            painter.drawRoundedRect(cx - 9, cy - 5, 16, 10, 2, 2)
+            painter.drawRoundedRect(QRectF(cx - 9, cy - 5, 16, 10), 2, 2)
             painter.drawRect(int(cx + 7), int(cy - 2), 3, 4)
         elif kind == "temp":
             painter.drawLine(QPointF(cx - 6, cy + 6), QPointF(cx - 6, cy - 2))
@@ -66,7 +67,7 @@ class IndicatorGlyph(QWidget):
             painter.drawLine(QPointF(cx - 6, cy), QPointF(cx + 6, cy))
             painter.drawLine(QPointF(cx, cy), QPointF(cx, cy + 5))
         elif kind == "station":
-            painter.drawRoundedRect(cx - 7, cy - 6, 14, 13, 2, 2)
+            painter.drawRoundedRect(QRectF(cx - 7, cy - 6, 14, 13), 2, 2)
             painter.drawLine(QPointF(cx - 3, cy - 2), QPointF(cx - 1, cy - 5))
             painter.drawLine(QPointF(cx + 1, cy - 2), QPointF(cx + 3, cy - 5))
         elif kind == "rpm":
