@@ -77,7 +77,7 @@ class BatteryStatusWidget(QWidget):
 
         fill_width = (battery_rect.width() - 4.0) * (self._percent / 100.0)
         if fill_width > 1.0:
-            grad = QLinearGradient(battery_rect.left(), battery_rect.top(), battery_rect.right(), battery_rect.top())
+            grad = QLinearGradient(battery_rect.topLeft(), battery_rect.topRight())
             grad.setColorAt(0.0, QColor("#2f4674"))
             grad.setColorAt(1.0, level_color)
             painter.setPen(Qt.PenStyle.NoPen)
@@ -143,7 +143,7 @@ class TemperatureStatusWidget(QWidget):
 
         fill = (gauge.width() - 4.0) * self._ratio()
         if fill > 1.0:
-            grad = QLinearGradient(gauge.left(), gauge.top(), gauge.right(), gauge.top())
+            grad = QLinearGradient(gauge.topLeft(), gauge.topRight())
             grad.setColorAt(0.0, QColor("#2f4674"))
             grad.setColorAt(1.0, color)
             painter.setPen(Qt.PenStyle.NoPen)
@@ -223,7 +223,7 @@ class MeterBarWidget(QWidget):
 
         fill = (bar.width() - 4.0) * self._ratio
         if fill > 1.0:
-            grad = QLinearGradient(bar.left(), bar.top(), bar.right(), bar.top())
+            grad = QLinearGradient(bar.topLeft(), bar.topRight())
             grad.setColorAt(0.0, QColor("#2f4674"))
             grad.setColorAt(1.0, self._color)
             painter.setPen(Qt.PenStyle.NoPen)

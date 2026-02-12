@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
-from src.ui.components import BottomBar, CenterPanel, CircularGauge, IndicatorRow, IndicatorSpec
-from src.ui.visibility import set_visible_if, value_is_present
+from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge, DriveTopIndicators
 
 MAX_SPEED_KMH = 200
 MAX_RPM = 8000
@@ -25,19 +24,8 @@ class ClusterScreen(QWidget):
 
         top_bar = QHBoxLayout()
         top_bar.setSpacing(8)
-        self.vehicle_state = QLabel("")
-        self.vehicle_state.setObjectName("TopStatusState")
-        self.indicators = IndicatorRow(
-            [
-                IndicatorSpec("vehicle_charging", "charging", "CHG", active_color="#5ea9ff"),
-                IndicatorSpec("overheat", "temp", "TEMP", active_color="#ff6d64"),
-                IndicatorSpec("battery_low", "battery", "BATT", active_color="#ffb347"),
-                IndicatorSpec("brake", "brake", "BRAKE", active_color="#ff6d64"),
-                IndicatorSpec("abs_fault", "abs", "ABS", active_color="#ff8f66"),
-            ]
-        )
-        top_bar.addWidget(self.vehicle_state, 0)
-        top_bar.addWidget(self.indicators, 1)
+        self.top_indicators = DriveTopIndicators()
+        top_bar.addWidget(self.top_indicators)
         root.addLayout(top_bar)
 
         middle = QHBoxLayout()
@@ -74,16 +62,8 @@ class ClusterScreen(QWidget):
         middle.addWidget(self.rpm_gauge, 1)
         root.addLayout(middle, 1)
 
-        self.bottom_bar = BottomBar(show_charge_station=False)
+        self.bottom_bar = BottomBarStrip()
         root.addWidget(self.bottom_bar)
-
-        nav = QHBoxLayout()
-        nav.addStretch(1)
-        self.tech_button = QPushButton("TECH")
-        self.tech_button.setObjectName("NavButton")
-        self.tech_button.clicked.connect(self.tech_requested.emit)
-        nav.addWidget(self.tech_button)
-        root.addLayout(nav)
 
     def render(self, state: VehicleTechState) -> None:
         speed = state.speed_kmh
@@ -97,30 +77,13 @@ class ClusterScreen(QWidget):
         self.speed_gauge.set_value(float(speed) if speed is not None else 0.0)
         self.rpm_gauge.set_value(float(rpm) if rpm is not None else 0.0)
 
-        if set_visible_if(self.vehicle_state, value_is_present(charging)):
-            self.vehicle_state.setText("CHARGE" if charging else "DRIVE")
-
         self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "DRIVE")
 
-        battery_pct = None if battery_v is None else (battery_v - 42.0) / 12.0 * 100.0
-        station_current = state.station_current_A
-        brake_percent = None if brake is None else min(100.0, max(0.0, brake * 4.0))
-        self.bottom_bar.set_values(
-            battery_v,
-            battery_pct,
-            charging,
-            station_current,
-            steering_angle,
-            motor_temp,
-            brake_percent,
-            temperature_label="MOTOR",
-        )
+        brake_active = None if brake is None else brake > 10.0
+        self.top_indicators.set_state(charging, charging, brake_active)
 
-        indicators = {
-            "vehicle_charging": charging,
-            "overheat": None if motor_temp is None else motor_temp >= 85,
-            "battery_low": None if battery_v is None else battery_v < 48,
-            "brake": None if brake is None else brake > 10,
-            "abs_fault": None,
-        }
-        self.indicators.update_status(indicators)
+        self.bottom_bar.set_values(
+            battery_voltage=battery_v,
+            battery_soc_percent=None,
+            motor_temp_c=motor_temp,
+        )
