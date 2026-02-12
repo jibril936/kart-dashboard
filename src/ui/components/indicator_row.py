@@ -83,6 +83,10 @@ class IndicatorGlyph(QWidget):
         elif kind == "ready":
             painter.drawLine(QPointF(cx - 6, cy + 1), QPointF(cx - 2, cy + 6))
             painter.drawLine(QPointF(cx - 2, cy + 6), QPointF(cx + 7, cy - 5))
+        elif kind == "abs":
+            painter.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            painter.drawRoundedRect(QRectF(cx - 10, cy - 6, 20, 12), 3, 3)
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "ABS")
         else:
             painter.setPen(QPen(color, 1.0))
             painter.setFont(QFont("Segoe UI", 8, QFont.Weight.DemiBold))
@@ -105,6 +109,8 @@ class IndicatorRow(QWidget):
 
         layout.addStretch(1)
 
-    def update_status(self, statuses: dict[str, bool]) -> None:
+    def update_status(self, statuses: dict[str, bool | None]) -> None:
         for key, chip in self._chips.items():
-            chip.set_status(bool(statuses.get(key, False)))
+            value = statuses.get(key)
+            chip.setVisible(value is not None)
+            chip.set_status(bool(value))

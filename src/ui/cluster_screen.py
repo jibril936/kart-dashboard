@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 from src.ui.components import BottomBar, CenterPanel, CircularGauge, IndicatorRow, IndicatorSpec
+from src.ui.components.status_widgets import AbsBadgeWidget
+from src.ui.visibility import set_visible_if, value_is_present
 
 MAX_SPEED_KMH = 200
 MAX_RPM = 8000
@@ -22,6 +24,8 @@ class ClusterScreen(QWidget):
         root.setContentsMargins(18, 14, 18, 12)
         root.setSpacing(8)
 
+        top_bar = QHBoxLayout()
+        top_bar.setSpacing(8)
         self.indicators = IndicatorRow(
             [
                 IndicatorSpec("battery_low", "battery", "BATT", active_color="#ffb347"),
@@ -36,7 +40,10 @@ class ClusterScreen(QWidget):
                 IndicatorSpec("ready", "ready", "READY", active_color="#63c6a8"),
             ]
         )
-        root.addWidget(self.indicators)
+        self.abs_badge = AbsBadgeWidget()
+        top_bar.addWidget(self.indicators, 1)
+        top_bar.addWidget(self.abs_badge, 0)
+        root.addLayout(top_bar)
 
         middle = QHBoxLayout()
         middle.setSpacing(16)
@@ -84,25 +91,36 @@ class ClusterScreen(QWidget):
         root.addLayout(nav)
 
     def render(self, state: VehicleTechState) -> None:
-        self.speed_gauge.set_value(state.speed_kmh)
-        self.rpm_gauge.set_value(float(state.rpm))
-        self.center_panel.set_state(state.steering_angle_deg, mode="CHARGE" if state.charging_state else "SPORT")
+        speed = state.speed_kmh
+        rpm = state.rpm
+        steering_angle = state.steering_angle_deg
+        charging = state.charging_state
+        battery_v = state.battery_voltage_V
+        brake = state.brake_state
+        motor_temp = state.motor_temp_C
 
-        battery_pct = (state.battery_voltage_V - 42.0) / 12.0 * 100.0
-        power_ratio = min(1.0, max(0.0, state.speed_kmh / 120.0))
-        regen_ratio = min(1.0, max(0.0, state.brake_state / 25.0))
-        self.bottom_bar.set_values(state.battery_voltage_V, battery_pct, power_ratio, regen_ratio, state.motor_temp_C)
+        self.speed_gauge.set_value(float(speed) if speed is not None else 0.0)
+        self.rpm_gauge.set_value(float(rpm) if rpm is not None else 0.0)
+        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else 0.0, mode="CHARGE" if charging else "SPORT")
+
+        battery_pct = None if battery_v is None else (battery_v - 42.0) / 12.0 * 100.0
+        power_ratio = None if speed is None else min(1.0, max(0.0, speed / 120.0))
+        regen_ratio = None if brake is None else min(1.0, max(0.0, brake / 25.0))
+        self.bottom_bar.set_values(battery_v, battery_pct, power_ratio, regen_ratio, motor_temp, temperature_label="MOTOR")
 
         indicators = {
-            "battery_low": state.battery_voltage_V < 48,
-            "overheat": state.motor_temp_C >= 85,
-            "charging": state.charging_state,
-            "brake": state.brake_state > 10,
-            "steering": abs(state.steering_angle_deg) > 25,
-            "station": state.station_current_A > 0.1,
-            "rpm_high": state.rpm > 6200,
-            "speed_high": state.speed_kmh > 110,
-            "sensor": state.steering_pot_voltage_V < 0.5 or state.steering_pot_voltage_V > 4.5,
-            "ready": state.battery_voltage_V >= 48 and state.motor_temp_C < 90,
+            "battery_low": None if battery_v is None else battery_v < 48,
+            "overheat": None if motor_temp is None else motor_temp >= 85,
+            "charging": charging,
+            "brake": None if brake is None else brake > 10,
+            "steering": None if steering_angle is None else abs(steering_angle) > 25,
+            "station": None if state.station_current_A is None else state.station_current_A > 0.1,
+            "rpm_high": None if rpm is None else rpm > 6200,
+            "speed_high": None if speed is None else speed > 110,
+            "sensor": None if state.steering_pot_voltage_V is None else state.steering_pot_voltage_V < 0.5 or state.steering_pot_voltage_V > 4.5,
+            "ready": None if (battery_v is None or motor_temp is None) else battery_v >= 48 and motor_temp < 90,
         }
         self.indicators.update_status(indicators)
+
+        if set_visible_if(self.abs_badge, value_is_present(state.abs_active)):
+            self.abs_badge.set_active(bool(state.abs_active))
