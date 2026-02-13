@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
@@ -19,6 +21,7 @@ class ClusterScreen(QWidget):
         super().__init__(parent)
         self._base_ui_scale = ui_scale
         self._effective_scale = ui_scale
+        self.setObjectName("ClusterScreen")
 
         self.root = QVBoxLayout(self)
         self.root.setContentsMargins(18, 14, 18, 12)
@@ -28,7 +31,7 @@ class ClusterScreen(QWidget):
         self.top_bar.setSpacing(8)
 
         self.tech_button = QPushButton("TECH")
-        self.tech_button.setObjectName("NavButton")
+        self.tech_button.setObjectName("TechButton")
         self.tech_button.clicked.connect(self.tech_requested.emit)
 
         self.top_bar.addStretch(1)
@@ -109,3 +112,34 @@ class ClusterScreen(QWidget):
             battery_soc_percent=None,
             motor_temp_c=motor_temp,
         )
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        _ = event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = QRectF(self.rect())
+        grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        grad.setColorAt(0.0, QColor("#060a12"))
+        grad.setColorAt(0.5, QColor("#090f1a"))
+        grad.setColorAt(1.0, QColor("#03060b"))
+        painter.fillRect(rect, grad)
+
+        painter.setPen(QPen(QColor(120, 170, 230, 24), 1.0))
+        spacing = 26
+        for i in range(-self.height(), self.width(), spacing):
+            painter.drawLine(i, 0, i + self.height(), self.height())
+            painter.drawLine(i, self.height(), i + self.height(), 0)
+
+        frame = rect.adjusted(8, 8, -8, -8)
+        shell = QPainterPath()
+        shell.addRoundedRect(frame, 16, 16)
+        painter.setPen(QPen(QColor("#123a63"), 1.2))
+        painter.drawPath(shell)
+
+        painter.setPen(QPen(QColor(80, 228, 255, 88), 1.6))
+        y1 = frame.top() + frame.height() * 0.15
+        y2 = frame.bottom() - frame.height() * 0.22
+        painter.drawLine(QPointF(frame.left() + 18, y1), QPointF(frame.right() - 140, y1))
+        painter.drawLine(QPointF(frame.left() + 140, y2), QPointF(frame.right() - 18, y2))

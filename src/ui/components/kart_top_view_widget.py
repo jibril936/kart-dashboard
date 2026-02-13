@@ -53,119 +53,72 @@ class KartTopViewWidget(QWidget):
         _ = event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
 
-        pad_x = int(8 * self._ui_scale)
-        pad_y = int(6 * self._ui_scale)
-        r = self.rect().adjusted(pad_x, pad_y, -pad_x, -pad_y)
+        r = self.rect().adjusted(int(8 * self._ui_scale), int(6 * self._ui_scale), -int(8 * self._ui_scale), -int(6 * self._ui_scale))
         if r.width() <= 0 or r.height() <= 0:
             return
 
-        center = r.center()
-
         plate = QPainterPath()
-        plate.addRoundedRect(QRectF(r), 18, 18)
-        painter.setPen(QPen(QColor("#2a3648"), 1.0))
-        bg_grad = QLinearGradient(r.left(), r.top(), r.left(), r.bottom())
-        bg_grad.setColorAt(0.0, QColor("#101927"))
-        bg_grad.setColorAt(0.65, QColor("#0d1522"))
-        bg_grad.setColorAt(1.0, QColor("#0a111c"))
-        painter.setBrush(bg_grad)
+        plate.addRoundedRect(QRectF(r), 16, 16)
+        painter.setPen(QPen(QColor("#4f6378"), 1.2))
+        shell = QLinearGradient(r.topLeft(), r.bottomRight())
+        shell.setColorAt(0.0, QColor("#0f1724"))
+        shell.setColorAt(0.5, QColor("#0a111b"))
+        shell.setColorAt(1.0, QColor("#060b11"))
+        painter.setBrush(shell)
         painter.drawPath(plate)
 
-        vignette = QRadialGradient(QPointF(center.x(), r.top() + r.height() * 0.45), r.width() * 0.7)
-        vignette.setColorAt(0.0, QColor(30, 46, 68, 28))
-        vignette.setColorAt(0.7, QColor(14, 22, 35, 18))
-        vignette.setColorAt(1.0, QColor(5, 9, 15, 110))
+        painter.setPen(QPen(QColor(86, 226, 248, 36), 1.0))
+        step = 18
+        for i in range(int(r.left()), int(r.right()), step):
+            painter.drawLine(i, int(r.top()), i + int(r.height() * 0.25), int(r.bottom()))
+
+        glow = QRadialGradient(QPointF(r.center().x(), r.center().y()), r.width() * 0.45)
+        glow.setColorAt(0.0, QColor(0, 240, 255, 36))
+        glow.setColorAt(1.0, QColor(0, 240, 255, 0))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(vignette)
-        painter.drawRoundedRect(QRectF(r), 18, 18)
-
-        self._draw_track(painter, r)
-
-    def _draw_track(self, painter: QPainter, r: QRectF) -> None:
-        track = QRectF(r.left() + r.width() * 0.12, r.top() + r.height() * 0.18, r.width() * 0.76, r.height() * 0.70)
-        track_path = QPainterPath()
-        track_path.moveTo(track.left() + track.width() * 0.08, track.bottom())
-        track_path.lineTo(track.left() + track.width() * 0.24, track.top())
-        track_path.lineTo(track.right() - track.width() * 0.24, track.top())
-        track_path.lineTo(track.right() - track.width() * 0.08, track.bottom())
-        track_path.closeSubpath()
-
-        lane_grad = QLinearGradient(track.topLeft(), track.bottomLeft())
-        lane_grad.setColorAt(0.0, QColor("#0b1119"))
-        lane_grad.setColorAt(1.0, QColor("#1a2433"))
-        painter.setPen(QPen(QColor("#26364d"), 1.0))
-        painter.setBrush(lane_grad)
-        painter.drawPath(track_path)
-
-        if not self._compact:
-            guide_color = QColor(165, 188, 214, 70)
-            painter.setPen(QPen(guide_color, 1.0))
-            painter.drawLine(
-                QPointF(track.left() + track.width() * 0.30, track.top() + 3),
-                QPointF(track.left() + track.width() * 0.16, track.bottom() - 6),
-            )
-            painter.drawLine(
-                QPointF(track.right() - track.width() * 0.30, track.top() + 3),
-                QPointF(track.right() - track.width() * 0.16, track.bottom() - 6),
-            )
-
-        glow = QRadialGradient(QPointF(track.center().x(), track.bottom() - 16), track.width() * 0.26)
-        glow.setColorAt(0.0, QColor(112, 160, 220, 48))
-        glow.setColorAt(1.0, QColor(112, 160, 220, 0))
         painter.setBrush(glow)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QPointF(track.center().x(), track.bottom() - 14), track.width() * 0.24, track.height() * 0.10)
+        painter.drawEllipse(r.center(), r.width() * 0.36, r.height() * 0.36)
 
-        self._draw_kart(painter, track)
+        self._draw_kart(painter, QRectF(r))
 
-    def _draw_kart(self, painter: QPainter, track: QRectF) -> None:
+    def _draw_kart(self, painter: QPainter, zone: QRectF) -> None:
         painter.save()
-        center = QPointF(track.center().x(), track.center().y() + 5)
-        scale = min(track.width() / 220.0, track.height() / 270.0)
+        center = QPointF(zone.center().x(), zone.center().y() + 6)
+        scale = min(zone.width() / 220.0, zone.height() / 260.0)
         painter.translate(center)
         painter.scale(scale, scale)
 
         chassis = QPainterPath()
-        chassis.moveTo(-20, -96)
-        chassis.lineTo(20, -96)
-        chassis.quadTo(28, -85, 26, -72)
-        chassis.lineTo(22, 20)
-        chassis.quadTo(18, 68, 34, 92)
-        chassis.lineTo(-34, 92)
-        chassis.quadTo(-18, 68, -22, 20)
-        chassis.lineTo(-26, -72)
-        chassis.quadTo(-28, -85, -20, -96)
+        chassis.moveTo(-18, -98)
+        chassis.lineTo(18, -98)
+        chassis.quadTo(30, -82, 28, -58)
+        chassis.lineTo(24, 26)
+        chassis.quadTo(20, 72, 38, 96)
+        chassis.lineTo(-38, 96)
+        chassis.quadTo(-20, 72, -24, 26)
+        chassis.lineTo(-28, -58)
+        chassis.quadTo(-30, -82, -18, -98)
         chassis.closeSubpath()
 
-        body_grad = QLinearGradient(0, -96, 0, 92)
-        body_grad.setColorAt(0.0, QColor("#22364f"))
-        body_grad.setColorAt(0.55, QColor("#1a2b42"))
-        body_grad.setColorAt(1.0, QColor("#111f31"))
-        painter.setPen(QPen(QColor("#607fa7"), 1.4))
-        painter.setBrush(body_grad)
+        body = QLinearGradient(0, -98, 0, 96)
+        body.setColorAt(0.0, QColor("#6ef1ff"))
+        body.setColorAt(0.12, QColor("#2acfff"))
+        body.setColorAt(0.35, QColor("#103d60"))
+        body.setColorAt(1.0, QColor("#0b1827"))
+        painter.setPen(QPen(QColor("#98f8ff"), 1.3))
+        painter.setBrush(body)
         painter.drawPath(chassis)
 
-        painter.setPen(QPen(QColor("#84a7d4"), 1.1))
-        painter.drawRoundedRect(QRectF(-15, -102, 30, 14), 4, 4)
-
-        seat = QPainterPath()
-        seat.addRoundedRect(QRectF(-18, -18, 36, 60), 14, 14)
-        seat_grad = QLinearGradient(0, -18, 0, 42)
-        seat_grad.setColorAt(0.0, QColor("#2a3e59"))
-        seat_grad.setColorAt(1.0, QColor("#17273b"))
-        painter.setPen(QPen(QColor("#6f8fb6"), 1.0))
-        painter.setBrush(seat_grad)
-        painter.drawPath(seat)
-
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor("#9ab8df"), 1.2))
-        painter.drawEllipse(QPointF(0, -42), 10, 10)
-        painter.drawLine(QPointF(-6, -42), QPointF(6, -42))
+        painter.setPen(QPen(QColor(154, 243, 255, 165), 1.0))
+        painter.drawRoundedRect(QRectF(-14, -16, 28, 54), 10, 10)
+        painter.drawEllipse(QPointF(0, -44), 10, 10)
+        painter.drawLine(QPointF(-6, -44), QPointF(6, -44))
+        painter.drawEllipse(QPointF(0, 12), 8, 8)
 
-        painter.setPen(QPen(QColor("#465f7f"), 1.3))
-        painter.drawLine(QPointF(-42, 48), QPointF(42, 48))
+        painter.setPen(QPen(QColor(103, 232, 255, 130), 1.1))
+        painter.drawLine(QPointF(-42, 50), QPointF(42, 50))
 
         angle = self._display_angle_deg
         inner = angle * (1.0 + ACKERMANN_FACTOR)
@@ -173,10 +126,10 @@ class KartTopViewWidget(QWidget):
         left_front = inner if angle > 0 else outer
         right_front = outer if angle > 0 else inner
 
-        self._draw_wheel(painter, QPointF(-48, -36), left_front, True)
-        self._draw_wheel(painter, QPointF(48, -36), right_front, False)
-        self._draw_wheel(painter, QPointF(-52, 48), 0.0, True)
-        self._draw_wheel(painter, QPointF(52, 48), 0.0, False)
+        self._draw_wheel(painter, QPointF(-50, -34), left_front, True)
+        self._draw_wheel(painter, QPointF(50, -34), right_front, False)
+        self._draw_wheel(painter, QPointF(-54, 50), 0.0, True)
+        self._draw_wheel(painter, QPointF(54, 50), 0.0, False)
 
         painter.restore()
 
@@ -191,13 +144,14 @@ class KartTopViewWidget(QWidget):
             painter.translate(-pivot_x, 0)
 
         tire = QRectF(-8, -18, 16, 36)
-        painter.setPen(QPen(QColor("#4d6685"), 1.1))
+        painter.setPen(QPen(QColor("#78e9ff"), 1.0))
         wheel_grad = QLinearGradient(tire.topLeft(), tire.bottomLeft())
-        wheel_grad.setColorAt(0.0, QColor("#111b29"))
-        wheel_grad.setColorAt(1.0, QColor("#090f18"))
+        wheel_grad.setColorAt(0.0, QColor("#0d1b29"))
+        wheel_grad.setColorAt(1.0, QColor("#04080e"))
         painter.setBrush(wheel_grad)
         painter.drawRoundedRect(tire, 4, 4)
 
-        painter.setPen(QPen(QColor(128, 164, 209, 70), 1.0))
-        painter.drawLine(QPointF(-5, -9), QPointF(5, -9))
+        painter.setPen(QPen(QColor(170, 248, 255, 105), 1.0))
+        painter.drawLine(QPointF(-4, -8), QPointF(4, -8))
+        painter.drawLine(QPointF(-4, 0), QPointF(4, 0))
         painter.restore()

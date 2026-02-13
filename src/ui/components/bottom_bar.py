@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QWidget
 
@@ -13,32 +13,60 @@ MOTOR_TEMP_MAX_C = 100.0
 
 
 class _StripGauge(QWidget):
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+    def __init__(self, title: str, icon: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._title = title
-        self.setMinimumHeight(58)
+        self._icon = icon
+        self.setMinimumHeight(74)
 
     def _draw_shell(self, painter: QPainter) -> tuple[QRectF, QRectF]:
-        rect = QRectF(self.rect()).adjusted(4.0, 4.0, -4.0, -4.0)
+        rect = QRectF(self.rect()).adjusted(3.0, 4.0, -3.0, -4.0)
+        shell = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        shell.setColorAt(0.0, QColor("#152130"))
+        shell.setColorAt(1.0, QColor("#070d15"))
+        painter.setPen(QPen(QColor("#3d4f63"), 1.2))
+        painter.setBrush(shell)
+        painter.drawRoundedRect(rect, 9, 9)
 
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#071224"))
-        painter.drawRect(rect)
+        gauge = QRectF(rect.left() + 14.0, rect.top() + 28.0, rect.width() - 28.0, 17.0)
+        painter.setPen(QPen(QColor("#263646"), 1.0))
+        painter.setBrush(QColor("#03070e"))
+        painter.drawRoundedRect(gauge, 5, 5)
 
-        gauge = QRectF(rect.left() + 8.0, rect.top() + 17.0, rect.width() - 16.0, 8.0)
-
-        painter.setPen(QPen(QColor("#355c95"), 1.0))
-        painter.drawLine(QPointF(gauge.left(), gauge.top()), QPointF(gauge.right(), gauge.top()))
-
-        painter.setPen(QColor("#c5d9f2"))
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(QRectF(rect.left() + 8.0, rect.top() + 2.0, rect.width() - 16.0, 12.0), Qt.AlignmentFlag.AlignLeft, self._title)
+        painter.setPen(QColor("#a7f5ff"))
+        painter.setFont(QFont("Bahnschrift", 9, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(rect.left() + 12, rect.top() + 5, rect.width() - 24, 16), Qt.AlignmentFlag.AlignLeft, f"{self._icon} {self._title}")
         return rect, gauge
+
+    def _segment_fill(self, painter: QPainter, gauge: QRectF, ratio: float, cold: QColor, hot: QColor) -> None:
+        segments = 16
+        gap = 2.0
+        segment_w = (gauge.width() - gap * (segments - 1)) / segments
+        active = int(round(segments * ratio))
+        for i in range(segments):
+            x = gauge.left() + i * (segment_w + gap)
+            seg = QRectF(x, gauge.top() + 2.0, segment_w, gauge.height() - 4.0)
+            t = i / max(1, segments - 1)
+            color = QColor(
+                int(cold.red() + (hot.red() - cold.red()) * t),
+                int(cold.green() + (hot.green() - cold.green()) * t),
+                int(cold.blue() + (hot.blue() - cold.blue()) * t),
+            )
+            if i < active:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(color)
+                painter.drawRoundedRect(seg, 2, 2)
+            else:
+                muted = QColor(color)
+                muted.setAlpha(38)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(muted)
+                painter.drawRoundedRect(seg, 2, 2)
 
 
 class BatteryBar(_StripGauge):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("BATTERY", parent)
+        super().__init__("BATTERY", "⚡", parent)
         self._voltage: float | None = None
 
     def set_data(self, voltage: float | None, soc_percent: float | None) -> None:
@@ -51,46 +79,29 @@ class BatteryBar(_StripGauge):
             return 0.0
         return max(0.0, min(1.0, (self._voltage - BATTERY_MIN_V) / (BATTERY_MAX_V - BATTERY_MIN_V)))
 
-    @staticmethod
-    def _fill_color() -> QColor:
-        return QColor("#5bc0ff")
-
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
         rect, gauge = self._draw_shell(painter)
 
-        painter.setPen(QPen(QColor("#3e5370"), 1.0))
-        for ratio in (0.0, 0.5, 1.0):
-            x = gauge.left() + ratio * gauge.width()
-            tick_h = 5.0 if ratio in (0.0, 1.0) else 4.0
-            painter.drawLine(QPointF(x, gauge.top()), QPointF(x, gauge.top() - tick_h))
+        ratio = self._fill_ratio()
+        self._segment_fill(painter, gauge, ratio, QColor("#ff3b3b"), QColor("#4cff7e"))
 
-        fill = (gauge.width() - 2.0) * self._fill_ratio()
-        if fill > 1.0:
-            grad = QLinearGradient(gauge.topLeft(), gauge.topRight())
-            grad.setColorAt(0.0, QColor("#2f4674"))
-            grad.setColorAt(1.0, self._fill_color())
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(grad)
-            painter.drawRect(QRectF(gauge.left() + 1.0, gauge.top() + 1.0, fill, gauge.height() - 2.0))
-
-        painter.setPen(QColor("#8098b3"))
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignLeft, f"{BATTERY_MIN_V:.0f}")
-        painter.drawText(QRectF(gauge.right() - 26.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignRight, f"{BATTERY_MAX_V:.0f}")
+        painter.setPen(QColor("#89a9be"))
+        painter.setFont(QFont("Bahnschrift", 8, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(gauge.left(), gauge.bottom() + 4.0, 28.0, 14.0), Qt.AlignmentFlag.AlignLeft, f"{BATTERY_MIN_V:.0f}")
+        painter.drawText(QRectF(gauge.right() - 30.0, gauge.bottom() + 4.0, 30.0, 14.0), Qt.AlignmentFlag.AlignRight, f"{BATTERY_MAX_V:.0f}")
 
         if self._voltage is not None:
-            painter.setPen(self._fill_color())
-            painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            painter.drawText(QRectF(rect.left() + 100.0, gauge.bottom() + 1.0, rect.width() - 108.0, 14.0), Qt.AlignmentFlag.AlignLeft, f"{self._voltage:.1f} V")
+            painter.setPen(QColor("#b6ffca"))
+            painter.setFont(QFont("Bahnschrift", 11, QFont.Weight.Bold))
+            painter.drawText(QRectF(rect.left() + 115.0, rect.top() + 4.0, rect.width() - 120.0, 16.0), Qt.AlignmentFlag.AlignLeft, f"{self._voltage:.1f} V")
 
 
 class TempBar(_StripGauge):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("MOTOR TEMP", parent)
+        super().__init__("MOTOR TEMP", "🌡", parent)
         self._temp_c: float = MOTOR_TEMP_MIN_C
 
     def set_data(self, temp_c: float) -> None:
@@ -100,49 +111,33 @@ class TempBar(_StripGauge):
     def _ratio(self) -> float:
         return max(0.0, min(1.0, (self._temp_c - MOTOR_TEMP_MIN_C) / (MOTOR_TEMP_MAX_C - MOTOR_TEMP_MIN_C)))
 
-    @staticmethod
-    def _color() -> QColor:
-        return QColor("#5bc0ff")
-
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
         rect, gauge = self._draw_shell(painter)
 
-        painter.setPen(QPen(QColor("#3e5370"), 1.0))
-        for ratio in (0.0, 0.5, 1.0):
-            x = gauge.left() + ratio * gauge.width()
-            painter.drawLine(QPointF(x, gauge.top()), QPointF(x, gauge.top() - 5.0))
+        ratio = self._ratio()
+        self._segment_fill(painter, gauge, ratio, QColor("#2ca3ff"), QColor("#ff4135"))
 
-        fill = (gauge.width() - 2.0) * self._ratio()
-        if fill > 1.0:
-            grad = QLinearGradient(gauge.topLeft(), gauge.topRight())
-            grad.setColorAt(0.0, QColor("#2f4674"))
-            grad.setColorAt(1.0, self._color())
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(grad)
-            painter.drawRect(QRectF(gauge.left() + 1.0, gauge.top() + 1.0, fill, gauge.height() - 2.0))
+        painter.setPen(QColor("#89a9be"))
+        painter.setFont(QFont("Bahnschrift", 8, QFont.Weight.DemiBold))
+        painter.drawText(QRectF(gauge.left(), gauge.bottom() + 4.0, 30.0, 14.0), Qt.AlignmentFlag.AlignLeft, f"{MOTOR_TEMP_MIN_C:.0f}")
+        painter.drawText(QRectF(gauge.right() - 30.0, gauge.bottom() + 4.0, 30.0, 14.0), Qt.AlignmentFlag.AlignRight, f"{MOTOR_TEMP_MAX_C:.0f}")
 
-        painter.setPen(QColor("#8098b3"))
-        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignLeft, f"{MOTOR_TEMP_MIN_C:.0f}")
-        painter.drawText(QRectF(gauge.right() - 24.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignRight, f"{MOTOR_TEMP_MAX_C:.0f}")
-
-        painter.setPen(self._color())
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        painter.drawText(QRectF(rect.left() + 100.0, gauge.bottom() + 1.0, rect.width() - 108.0, 14.0), Qt.AlignmentFlag.AlignLeft, f"{self._temp_c:.0f}°C")
+        painter.setPen(QColor("#ffd0ca"))
+        painter.setFont(QFont("Bahnschrift", 11, QFont.Weight.Bold))
+        painter.drawText(QRectF(rect.left() + 132.0, rect.top() + 4.0, rect.width() - 140.0, 16.0), Qt.AlignmentFlag.AlignLeft, f"{self._temp_c:.0f}°C")
 
 
 class BottomBarStrip(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("BottomBarStrip")
-        self.setMinimumHeight(66)
+        self.setMinimumHeight(82)
 
         self._layout = QHBoxLayout(self)
-        self._layout.setContentsMargins(12, 4, 12, 4)
+        self._layout.setContentsMargins(10, 4, 10, 4)
         self._layout.setSpacing(8)
 
         self.battery_bar = BatteryBar()

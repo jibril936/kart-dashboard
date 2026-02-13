@@ -4,45 +4,13 @@ from __future__ import annotations
 def dark_theme_qss() -> str:
     return """
     QWidget {
-        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #090f18, stop:0.55 #080d16, stop:1 #05080e);
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #070b12, stop:0.5 #05080f, stop:1 #020408);
         color: #e7edf5;
-        font-family: 'Inter', 'Segoe UI', sans-serif;
+        font-family: 'Bahnschrift', 'Inter', 'Segoe UI', sans-serif;
         font-size: 13px;
     }
     QStackedWidget, QListWidget, QFrame, QWidget#ClusterScreen, QWidget#TechScreen {
         background: transparent;
-    }
-    QLabel#SectionTitle {
-        color: #cfe3ff;
-        font-size: 16px;
-        font-weight: 700;
-        letter-spacing: 0.4px;
-    }
-    QLabel#KpiValue {
-        color: #f2f7ff;
-        font-size: 16px;
-        font-weight: 700;
-        min-width: 56px;
-    }
-    QLabel#StatusOK { color: #53d7be; font-weight: 700; }
-    QLabel#StatusWARN { color: #7dbbff; font-weight: 700; }
-    QLabel#StatusCRIT { color: #7dbbff; font-weight: 700; }
-
-    QFrame#SectionPanel {
-        background: rgba(12, 19, 30, 0.78);
-        border: 1px solid #223042;
-        border-radius: 10px;
-    }
-    QFrame#KpiLine {
-        background: rgba(10, 16, 26, 0.9);
-        border: 1px solid #223447;
-        border-radius: 8px;
-    }
-    QListWidget#AlertList {
-        background: rgba(12, 18, 30, 0.7);
-        border: 1px solid #223447;
-        border-radius: 8px;
-        outline: none;
     }
 
     QPushButton#NavButton {
@@ -55,15 +23,26 @@ def dark_theme_qss() -> str:
         font-weight: 700;
         letter-spacing: 0.7px;
     }
-    QPushButton#NavButton:hover {
-        background: rgba(43, 62, 95, 0.96);
-        border: 1px solid #6982ca;
+
+    QPushButton#TechButton {
+        color: #c9f8ff;
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(17,52,78,0.95), stop:1 rgba(4,16,28,0.95));
+        border: 1px solid #5cc8e6;
+        border-radius: 5px;
+        padding: 6px 22px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 2px;
+    }
+    QPushButton#TechButton:hover {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(24,76,112,0.98), stop:1 rgba(5,23,41,0.98));
+        border: 1px solid #88eeff;
     }
 
     QFrame#BottomBarStrip {
-        background: rgba(7, 14, 26, 0.95);
-        border-top: 1px solid #2a4365;
-        border-bottom: 1px solid #13253e;
+        background: rgba(5, 10, 18, 0.85);
+        border-top: 1px solid #325779;
+        border-bottom: 1px solid #101d2b;
         border-left: none;
         border-right: none;
         border-radius: 0;
