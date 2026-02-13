@@ -4,15 +4,11 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
-from src.ui.components import BottomBarStrip, CenterPanel, ChargingIndicator, CircularGauge
-from src.ui.visibility import set_visible_if
+from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge
 
 SPEED_MIN_KMH = 0
 SPEED_MAX_KMH = 60
-RPM_MIN = 0
-RPM_MAX = 8000
 SPEED_MAJOR_TICK = 10
-RPM_MAJOR_TICK = 1000
 MIN_GAUGE_CENTER_SPACING = 24
 
 
@@ -31,14 +27,11 @@ class ClusterScreen(QWidget):
         self.top_bar = QHBoxLayout()
         self.top_bar.setSpacing(8)
 
-        self.chg_indicator = ChargingIndicator()
-        self.chg_indicator.hide()
         self.tech_button = QPushButton("TECH")
         self.tech_button.setObjectName("NavButton")
         self.tech_button.clicked.connect(self.tech_requested.emit)
 
         self.top_bar.addStretch(1)
-        self.top_bar.addWidget(self.chg_indicator)
         self.top_bar.addWidget(self.tech_button)
         self.root.addLayout(self.top_bar)
 
@@ -56,20 +49,9 @@ class ClusterScreen(QWidget):
             side="right",
         )
         self.center_panel = CenterPanel()
-        self.rpm_gauge = CircularGauge(
-            "RPM",
-            "rpm",
-            RPM_MIN,
-            RPM_MAX,
-            major_tick_step=RPM_MAJOR_TICK,
-            minor_ticks_per_major=1,
-            label_formatter=lambda v: f"{int(v):d}",
-            side="left",
-        )
 
         self.middle.addWidget(self.speed_gauge, 1)
-        self.middle.addWidget(self.center_panel, 1)
-        self.middle.addWidget(self.rpm_gauge, 1)
+        self.middle.addWidget(self.center_panel, 2)
         self.root.addLayout(self.middle, 1)
 
         self.bottom_bar = BottomBarStrip()
@@ -92,7 +74,6 @@ class ClusterScreen(QWidget):
         self.center_panel.set_compact_mode(compact, s)
         self.center_panel.kart_widget.set_compact_mode(compact, s)
         self.speed_gauge.set_compact_mode(compact, s)
-        self.rpm_gauge.set_compact_mode(compact, s)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -100,7 +81,6 @@ class ClusterScreen(QWidget):
 
     def render(self, state: VehicleTechState) -> None:
         speed = state.speed_kmh
-        rpm = state.rpm
         steering_angle = state.steering_angle_deg
         charging = state.charging_state
         battery_v = state.battery_voltage_V
@@ -110,10 +90,6 @@ class ClusterScreen(QWidget):
         self.speed_gauge.setVisible(speed is not None)
         if speed is not None:
             self.speed_gauge.set_value(float(speed))
-
-        self.rpm_gauge.setVisible(rpm is not None)
-        if rpm is not None:
-            self.rpm_gauge.set_value(float(rpm))
 
         drive_mode = getattr(state, "drive_mode", None)
         control_mode = getattr(state, "control_mode", None)
@@ -127,7 +103,6 @@ class ClusterScreen(QWidget):
         )
 
         _ = brake
-        set_visible_if(self.chg_indicator, bool(charging))
 
         self.bottom_bar.set_values(
             battery_voltage=battery_v,
