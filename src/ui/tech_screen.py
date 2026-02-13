@@ -80,7 +80,7 @@ class TechScreen(QWidget):
             "steering_current_A": KpiLine("Courant direction", "A"),
             "speed_kmh": KpiLine("Vitesse", "km/h"),
             "rpm": KpiLine("RPM", "tr/min"),
-            "brake_state": KpiLine("Frein", "%"),
+            "brake_state": KpiLine("Frein", ""),
             "motor_temp_C": KpiLine("Température moteur", "°C"),
         }
 
@@ -133,7 +133,8 @@ class TechScreen(QWidget):
 
         self.kpi["speed_kmh"].set_data(f"{state.speed_kmh:.1f}", "WARN" if state.speed_kmh > 90 else "OK")
         self.kpi["rpm"].set_data(f"{state.rpm}", "WARN" if state.rpm > 5200 else "OK")
-        self.kpi["brake_state"].set_data(f"{state.brake_state:.0f}", "WARN" if state.brake_state > 0 else "OK")
+        brake_active = (state.brake_state or 0.0) >= 0.5
+        self.kpi["brake_state"].set_data("ON" if brake_active else "OFF", "WARN" if brake_active else "OK")
 
         temp_status = "CRIT" if state.motor_temp_C >= 95 else "WARN" if state.motor_temp_C >= 85 else "OK"
         self.kpi["motor_temp_C"].set_data(f"{state.motor_temp_C:.1f}", temp_status)
@@ -155,7 +156,7 @@ class TechScreen(QWidget):
         if abs(state.steering_angle_deg) > 28:
             alerts.append(("WARN", "Steering angle near limit"))
 
-        if state.brake_state > 10:
+        if (state.brake_state or 0.0) >= 0.5:
             alerts.append(("INFO", "Brake pressure event"))
 
         ts = datetime.fromtimestamp(state.sample_timestamp_ms / 1000).strftime("%H:%M:%S")
