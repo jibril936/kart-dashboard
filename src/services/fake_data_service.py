@@ -17,12 +17,18 @@ class FakeDataService(DataService):
         self._t0 = time.monotonic()
         self._state = default_state()
 
+    @staticmethod
+    def _triangle_wave(t: float, period_s: float = 30.0) -> float:
+        phase = (t % period_s) / period_s
+        return 1.0 - abs(2.0 * phase - 1.0)
+
     def sample(self) -> VehicleTechState:
         t = time.monotonic() - self._t0
         now = utc_now_ms()
 
-        base_speed = 12.0 + 10.0 * (0.5 + 0.5 * math.sin(0.35 * t))
-        base_rpm = int(900 + 1200 * (0.5 + 0.5 * math.sin(0.35 * t + 0.5)))
+        speed_wave = self._triangle_wave(t, period_s=30.0)
+        base_speed = 60.0 * speed_wave
+        base_rpm = int(900 + 1700 * speed_wave)
 
         self._state.battery_voltage_V = 52.0 + 0.35 * math.sin(0.3 * t)
         self._state.battery_charge_current_A = 8.0 + 1.5 * math.sin(0.5 * t)
