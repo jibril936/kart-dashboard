@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget
 
 from src.core.state import VehicleTechState
@@ -11,6 +13,7 @@ class DashboardMainWindow(QMainWindow):
     def __init__(self, ui_scale: float = 1.0) -> None:
         super().__init__()
         self.setWindowTitle("Kart Dashboard — Cluster / Tech")
+        self._allow_escape_fullscreen = False
 
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
@@ -35,3 +38,13 @@ class DashboardMainWindow(QMainWindow):
     def render(self, state: VehicleTechState) -> None:
         self.cluster_screen.render(state)
         self.tech_screen.render(state)
+
+    def enable_escape_fullscreen(self) -> None:
+        self._allow_escape_fullscreen = True
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if self._allow_escape_fullscreen and self.isFullScreen() and event.key() == Qt.Key.Key_Escape:
+            self.showNormal()
+            event.accept()
+            return
+        super().keyPressEvent(event)
