@@ -61,7 +61,7 @@ class KartTopViewWidget(QWidget):
         plate = QPainterPath()
         plate.addRoundedRect(QRectF(r), 16, 16)
         painter.setPen(QPen(QColor("#4f6378"), 1.2))
-        shell = QLinearGradient(r.topLeft(), r.bottomRight())
+        shell = QLinearGradient(QPointF(r.topLeft()), QPointF(r.bottomRight()))
         shell.setColorAt(0.0, QColor("#0f1724"))
         shell.setColorAt(0.5, QColor("#0a111b"))
         shell.setColorAt(1.0, QColor("#060b11"))
