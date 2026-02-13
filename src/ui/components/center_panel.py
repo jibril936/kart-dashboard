@@ -91,26 +91,44 @@ class CenterPanel(QWidget):
         painter.setBrush(QColor(194, 211, 255, 75))
         painter.drawEllipse(halo_center, 36, 10)
 
-        painter.save()
-        painter.translate(center.x(), stage.center().y() + 2)
-        painter.rotate(self._display_angle_deg)
-        painter.scale(1.05, 0.83)
+        kart_center = QPointF(center.x(), stage.center().y() + 2)
 
+        # Châssis du kart (reste fixe au centre)
+        painter.save()
+        painter.translate(kart_center)
         painter.setPen(QPen(QColor("#3f5f8b"), 1.4))
         painter.setBrush(QColor("#101a29"))
-        painter.drawRoundedRect(-42, -72, 84, 142, 24, 24)
+        painter.drawRoundedRect(-38, -26, 76, 88, 20, 20)
         painter.setBrush(QColor("#1d2f49"))
-        painter.drawRoundedRect(-20, -44, 40, 24, 8, 8)
-        painter.drawRoundedRect(-20, 12, 40, 24, 8, 8)
-
-        painter.setBrush(QColor("#0c121e"))
-        painter.drawRoundedRect(-52, -54, 10, 30, 3, 3)
-        painter.drawRoundedRect(42, -54, 10, 30, 3, 3)
-        painter.drawRoundedRect(-52, 24, 10, 30, 3, 3)
-        painter.drawRoundedRect(42, 24, 10, 30, 3, 3)
+        painter.drawRoundedRect(-14, -6, 28, 20, 6, 6)
+        painter.setBrush(QColor("#132840"))
+        painter.drawRoundedRect(-18, 22, 36, 22, 7, 7)
+        painter.setPen(QPen(QColor("#5e7ea8"), 2.0))
+        painter.drawLine(QPointF(-28, -4), QPointF(28, -4))
         painter.restore()
+
+        # Roues arrière fixes
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#0c121e"))
+        painter.drawRoundedRect(kart_center.x() - 52, kart_center.y() + 22, 12, 30, 4, 4)
+        painter.drawRoundedRect(kart_center.x() + 40, kart_center.y() + 22, 12, 30, 4, 4)
+
+        # Roues avant orientables en fonction de l'angle
+        self._draw_steering_wheel(painter, QPointF(kart_center.x() - 46, kart_center.y() - 26), self._display_angle_deg)
+        self._draw_steering_wheel(painter, QPointF(kart_center.x() + 46, kart_center.y() - 26), self._display_angle_deg)
 
         if self._has_steering:
             painter.setPen(QColor("#d8e6f6"))
             painter.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
             painter.drawText(rect.adjusted(0, 0, 0, -8), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, f"{self._display_angle_deg:+.1f}°")
+
+    def _draw_steering_wheel(self, painter: QPainter, center: QPointF, angle_deg: float) -> None:
+        painter.save()
+        painter.translate(center)
+        painter.rotate(angle_deg)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#0c121e"))
+        painter.drawRoundedRect(-6, -15, 12, 30, 4, 4)
+        painter.setBrush(QColor("#1f334f"))
+        painter.drawRoundedRect(-4, -10, 8, 20, 3, 3)
+        painter.restore()

@@ -89,7 +89,7 @@ class ClusterScreen(QWidget):
         drive_mode = None if charging is None else ("CHARGE" if charging else "DRIVE")
         self.center_panel.set_state(float(steering_angle) if steering_angle is not None else None, mode=drive_mode, gear=None)
 
-        brake_active = None if brake is None else brake > 10.0
+        brake_active = None if brake is None else brake >= 0.5
         self.top_indicators.set_state(
             battery_voltage_v=battery_v,
             motor_temp_c=motor_temp,
