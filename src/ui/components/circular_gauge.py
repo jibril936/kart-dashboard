@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Literal
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QBrush, QColor, QConicalGradient, QFont, QPainter, QPen
+from PyQt6.QtGui import QBrush, QColor, QConicalGradient, QFont, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import QWidget
 
 
@@ -60,8 +60,11 @@ class CircularGauge(QWidget):
         return f"{value:.1f}"
 
     def set_value(self, value: float) -> None:
-        self._value = max(self.min_value, min(self.max_value, value))
+        self._value = self._clamp_value(value)
         self.update()
+
+    def _clamp_value(self, value: float) -> float:
+        return max(self.min_value, min(self.max_value, value))
 
     def _status_color(self) -> QColor:
         return QColor("#6d88ff")
@@ -80,7 +83,7 @@ class CircularGauge(QWidget):
         return int(round(degrees * 16))
 
     def _value_to_ratio(self, value: float) -> float:
-        return self._value_ratio(value)
+        return self._value_ratio(self._clamp_value(value))
 
     def _ratio_to_angle(self, ratio: float) -> float:
         clamped_ratio = max(0.0, min(1.0, ratio))
@@ -104,7 +107,7 @@ class CircularGauge(QWidget):
         span_deg = self._sweep_angle_deg
         span_sign = self._direction * span_deg
         inward_shift = radius * 0.08 * side_sign
-        hub_center = QPointF(center_f.x() + inward_shift, center_f.y())
+        hub_center = QPointF(center_f)
 
         outer_rect = QRectF(center_f.x() - radius * 0.82, center_f.y() - radius * 0.82, radius * 1.64, radius * 1.64)
         inner_ring_rect = QRectF(center_f.x() - radius * 0.56, center_f.y() - radius * 0.56, radius * 1.12, radius * 1.12)
@@ -117,7 +120,8 @@ class CircularGauge(QWidget):
         painter.setPen(QPen(QColor("#1f2a3a"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
 
-        ratio = self._value_to_ratio(self._value)
+        clamped_value = self._clamp_value(self._value)
+        ratio = self._value_to_ratio(clamped_value)
         value_span = span_sign * ratio
         active_grad = QConicalGradient(center_f, start_deg)
         active_grad.setColorAt(0.0, QColor("#8b9cff"))
@@ -163,25 +167,6 @@ class CircularGauge(QWidget):
                 label_rect = QRectF(label_point.x() - 15, label_point.y() - 9, 30, 18)
                 painter.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), self.label_formatter(value))
 
-        pointer_deg = self._value_to_angle(self._value)
-        pointer_rad = math.radians(pointer_deg)
-        pointer_end = QPointF(
-            hub_center.x() + math.cos(pointer_rad) * radius * 0.62,
-            hub_center.y() - math.sin(pointer_rad) * radius * 0.62,
-        )
-        painter.setPen(QPen(QColor("#f4f9ff"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(hub_center, pointer_end)
-
-        hub_glow = QColor("#7b95ff")
-        hub_glow.setAlpha(80)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(hub_glow)
-        painter.drawEllipse(hub_center, 12, 12)
-        painter.setBrush(QColor("#dce7f5"))
-        painter.drawEllipse(hub_center, 7, 7)
-        painter.setBrush(QColor("#2e3f57"))
-        painter.drawEllipse(hub_center, 3, 3)
-
         painter.setPen(QColor("#8ea5be"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
         title_rect = rect.adjusted(0, int(8 * self._ui_scale), 0, 0)
@@ -201,3 +186,53 @@ class CircularGauge(QWidget):
         unit_rect = rect.adjusted(0, unit_y_offset, 0, 0)
         unit_rect.translate(self._i(inward_shift), 0)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignHCenter, self.unit)
+
+        # Needle is intentionally painted above center text to mimic automotive clusters.
+        pointer_deg = self._value_to_angle(clamped_value)
+        pointer_rad = math.radians(pointer_deg)
+        pointer_radius = radius * 0.80
+        counter_radius = radius * 0.08
+        axis_vec = QPointF(math.cos(pointer_rad), -math.sin(pointer_rad))
+        normal_vec = QPointF(-axis_vec.y(), axis_vec.x())
+        needle_tip = QPointF(hub_center.x() + axis_vec.x() * pointer_radius, hub_center.y() + axis_vec.y() * pointer_radius)
+        needle_tail = QPointF(hub_center.x() - axis_vec.x() * counter_radius, hub_center.y() - axis_vec.y() * counter_radius)
+
+        needle_glow = QColor("#89f7ff")
+        needle_glow.setAlpha(82)
+        painter.setPen(QPen(needle_glow, 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(needle_tail, needle_tip)
+
+        needle_color = QColor("#d8fcff")
+        painter.setPen(QPen(needle_color, 3.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(needle_tail, needle_tip)
+
+        tip_base = QPointF(
+            hub_center.x() + axis_vec.x() * (pointer_radius - radius * 0.06),
+            hub_center.y() + axis_vec.y() * (pointer_radius - radius * 0.06),
+        )
+        tip_w = radius * 0.016
+        tip_polygon = QPolygonF(
+            [
+                needle_tip,
+                QPointF(tip_base.x() + normal_vec.x() * tip_w, tip_base.y() + normal_vec.y() * tip_w),
+                QPointF(tip_base.x() - normal_vec.x() * tip_w, tip_base.y() - normal_vec.y() * tip_w),
+            ]
+        )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#f1fdff"))
+        painter.drawPolygon(tip_polygon)
+
+        if counter_radius > 0:
+            painter.setBrush(QColor("#bdefff"))
+            painter.drawEllipse(needle_tail, radius * 0.016, radius * 0.016)
+
+        hub_glow = QColor("#9db0c5")
+        hub_glow.setAlpha(62)
+        painter.setBrush(hub_glow)
+        painter.drawEllipse(hub_center, 13, 13)
+        painter.setBrush(QColor("#2b3748"))
+        painter.drawEllipse(hub_center, 8, 8)
+        painter.setBrush(QColor("#dbe8f6"))
+        painter.drawEllipse(hub_center, 5, 5)
+        painter.setBrush(QColor("#152232"))
+        painter.drawEllipse(hub_center, 2.2, 2.2)
