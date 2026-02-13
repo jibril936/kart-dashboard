@@ -40,11 +40,15 @@ class CircularGauge(QWidget):
         self._value = min_value
         self._compact = False
         self._ui_scale = 1.0
+        self._base_min_size = 280
+        self._gap_angle_deg = 82
         self.setMinimumSize(280, 280)
 
     def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
         self._compact = compact
         self._ui_scale = ui_scale
+        min_size = int((228 if compact else self._base_min_size) * ui_scale)
+        self.setMinimumSize(min_size, min_size)
         self.update()
 
     def _default_label_formatter(self, value: float) -> str:
@@ -79,8 +83,10 @@ class CircularGauge(QWidget):
         center_f = QPointF(rect.center())
         radius = min(rect.width(), rect.height()) / 2
 
-        start_deg = 225 if self.side == "left" else 45
-        span_deg = 270
+        gap_center_deg = 0 if self.side == "right" else 180
+        gap_half = self._gap_angle_deg / 2.0
+        start_deg = gap_center_deg + gap_half
+        span_deg = 360 - self._gap_angle_deg
         inward_shift = radius * 0.08 * side_sign
         hub_center = QPointF(center_f.x() + inward_shift, center_f.y())
 
@@ -166,16 +172,16 @@ class CircularGauge(QWidget):
         title_rect.translate(self._i(inward_shift), 0)
         painter.drawText(title_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
 
-        value_text = f"{self._value:.0f}" if self.max_value >= 100 else f"{self._value:.1f}"
+        value_text = f"{self._value:.0f}"
         painter.setPen(QColor("#f4f8ff"))
         painter.setFont(QFont("Segoe UI", max(20, int((28 if self._compact else 31) * self._ui_scale)), QFont.Weight.Bold))
-        value_rect = rect.adjusted(0, int(-4 * self._ui_scale), 0, 0)
+        value_rect = rect.adjusted(0, int(-9 * self._ui_scale), 0, 0)
         value_rect.translate(self._i(inward_shift), 0)
         painter.drawText(value_rect, Qt.AlignmentFlag.AlignCenter, value_text)
 
         painter.setPen(QColor("#90a4bd"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.Medium))
-        unit_y_offset = int((34 if self._compact else 40) * self._ui_scale)
+        unit_y_offset = int((26 if self._compact else 30) * self._ui_scale)
         unit_rect = rect.adjusted(0, unit_y_offset, 0, 0)
         unit_rect.translate(self._i(inward_shift), 0)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignHCenter, self.unit)

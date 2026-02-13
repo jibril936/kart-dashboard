@@ -4,12 +4,16 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
-from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge, DriveTopIndicators
+from src.ui.components import BottomBarStrip, CenterPanel, ChargingIndicator, CircularGauge
+from src.ui.visibility import set_visible_if
 
-MAX_SPEED_KMH = 60
-MAX_RPM = 60
+SPEED_MIN_KMH = 0
+SPEED_MAX_KMH = 60
+RPM_MIN = 0
+RPM_MAX = 8000
 SPEED_MAJOR_TICK = 10
-RPM_MAJOR_TICK = 10
+RPM_MAJOR_TICK = 1000
+MIN_GAUGE_CENTER_SPACING = 24
 
 
 class ClusterScreen(QWidget):
@@ -26,11 +30,15 @@ class ClusterScreen(QWidget):
 
         self.top_bar = QHBoxLayout()
         self.top_bar.setSpacing(8)
-        self.top_indicators = DriveTopIndicators()
+
+        self.chg_indicator = ChargingIndicator()
+        self.chg_indicator.hide()
         self.tech_button = QPushButton("TECH")
         self.tech_button.setObjectName("NavButton")
         self.tech_button.clicked.connect(self.tech_requested.emit)
-        self.top_bar.addWidget(self.top_indicators)
+
+        self.top_bar.addStretch(1)
+        self.top_bar.addWidget(self.chg_indicator)
         self.top_bar.addWidget(self.tech_button)
         self.root.addLayout(self.top_bar)
 
@@ -40,8 +48,8 @@ class ClusterScreen(QWidget):
         self.speed_gauge = CircularGauge(
             "SPEED",
             "km/h",
-            0,
-            MAX_SPEED_KMH,
+            SPEED_MIN_KMH,
+            SPEED_MAX_KMH,
             major_tick_step=SPEED_MAJOR_TICK,
             minor_ticks_per_major=1,
             label_formatter=lambda v: f"{int(v):d}",
@@ -51,8 +59,8 @@ class ClusterScreen(QWidget):
         self.rpm_gauge = CircularGauge(
             "RPM",
             "rpm",
-            0,
-            MAX_RPM,
+            RPM_MIN,
+            RPM_MAX,
             major_tick_step=RPM_MAJOR_TICK,
             minor_ticks_per_major=1,
             label_formatter=lambda v: f"{int(v):d}",
@@ -74,9 +82,11 @@ class ClusterScreen(QWidget):
         self._effective_scale = max(0.75, min(1.2, self._base_ui_scale * auto_scale))
         s = self._effective_scale
 
-        self.root.setContentsMargins(int(18 * s), int(14 * s), int(18 * s), int(12 * s))
+        horizontal_margin = (12 if compact else 18) * s
+        self.root.setContentsMargins(int(horizontal_margin), int(14 * s), int(horizontal_margin), int(12 * s))
         self.root.setSpacing(int(8 * s))
-        self.middle.setSpacing(int((10 if compact else 16) * s))
+        spacing = max(int(MIN_GAUGE_CENTER_SPACING * s), int((24 if compact else 30) * s))
+        self.middle.setSpacing(spacing)
         self.top_bar.setSpacing(int((6 if compact else 8) * s))
 
         self.center_panel.set_compact_mode(compact, s)
@@ -116,13 +126,8 @@ class ClusterScreen(QWidget):
             gear=None,
         )
 
-        brake_active = None if brake is None else brake >= 0.5
-        self.top_indicators.set_state(
-            battery_voltage_v=battery_v,
-            motor_temp_c=motor_temp,
-            is_charging=charging,
-            brake_active=brake_active,
-        )
+        _ = brake
+        set_visible_if(self.chg_indicator, bool(charging))
 
         self.bottom_bar.set_values(
             battery_voltage=battery_v,
