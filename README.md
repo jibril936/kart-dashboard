@@ -54,6 +54,7 @@ source .venv/bin/activate
 export PYTHONPATH="$PWD"
 KART_FULLSCREEN=1 python src/main.py --demo --scenario normal
 python src/main.py --demo --scenario normal --fullscreen
+KART_FULLSCREEN=1 KART_KIOSK=1 python src/main.py --demo --scenario normal
 ```
 
 > Adapte le chemin home si différent.

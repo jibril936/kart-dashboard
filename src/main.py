@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtWidgets import QApplication
 
 from src.config.settings import load_settings
@@ -17,19 +17,22 @@ from src.ui.theme import dark_theme_qss
 
 def _apply_window_mode(window: DashboardMainWindow, fullscreen_enabled: bool, maximized_enabled: bool) -> None:
     if fullscreen_enabled:
-        window.showFullScreen()
+        window.show()
 
-        def _fullscreen_fallback() -> None:
-            if window.isFullScreen():
-                window.apply_fullscreen_cursor()
-                return
+        def _apply_fullscreen() -> None:
             screen = window.screen()
             if screen is not None:
-                window.resize(screen.availableGeometry().size())
-            window.showMaximized()
+                window.setGeometry(screen.geometry())
+            window.showFullScreen()
+
+        QTimer.singleShot(0, _apply_fullscreen)
+
+        def _verify_fullscreen() -> None:
+            if not window.isFullScreen():
+                _apply_fullscreen()
             window.apply_fullscreen_cursor()
 
-        QTimer.singleShot(150, _fullscreen_fallback)
+        QTimer.singleShot(200, _verify_fullscreen)
         return
 
     if maximized_enabled:
@@ -56,11 +59,17 @@ def main() -> int:
     app.setStyleSheet(dark_theme_qss())
 
     window = DashboardMainWindow(ui_scale=max(0.6, min(2.0, args.ui_scale)))
-    window.resize(1440, 900)
 
     fullscreen_enabled = args.fullscreen or os.getenv("KART_FULLSCREEN") == "1"
     maximized_enabled = os.getenv("KART_MAXIMIZED") == "1"
     hide_cursor_enabled = os.getenv("KART_HIDE_CURSOR") == "1"
+    kiosk_enabled = os.getenv("KART_KIOSK") == "1"
+
+    if kiosk_enabled and fullscreen_enabled:
+        window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+
+    if not fullscreen_enabled and not maximized_enabled:
+        window.resize(1440, 900)
 
     store = StateStore(default_state())
     service = FakeDataService(scenario=args.scenario)
