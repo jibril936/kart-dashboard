@@ -48,6 +48,7 @@ class ClusterScreen(QWidget):
             major_tick_step=SPEED_MAJOR_TICK,
             minor_ticks_per_major=1,
             label_formatter=lambda v: f"{int(v):d}",
+            side="right",
         )
         self.center_panel = CenterPanel()
         self.rpm_gauge = CircularGauge(
@@ -61,6 +62,7 @@ class ClusterScreen(QWidget):
             major_tick_step=RPM_MAJOR_TICK,
             minor_ticks_per_major=1,
             label_formatter=lambda v: f"{max(0, int(v // 1000))}",
+            side="left",
         )
 
         self.middle.addWidget(self.speed_gauge, 1)
