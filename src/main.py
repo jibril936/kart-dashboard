@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from PyQt6.QtCore import QTimer
@@ -32,6 +33,9 @@ def main() -> int:
     window = DashboardMainWindow(ui_scale=max(0.6, min(2.0, args.ui_scale)))
     window.resize(1440, 900)
 
+    fullscreen_enabled = os.getenv("KART_FULLSCREEN") == "1"
+    maximized_enabled = os.getenv("KART_MAXIMIZED") == "1"
+
     store = StateStore(default_state())
     service = FakeDataService(scenario=args.scenario)
 
@@ -43,7 +47,13 @@ def main() -> int:
     timer.timeout.connect(lambda: store.update(service.sample()))
     timer.start()
 
-    window.show()
+    if fullscreen_enabled:
+        window.enable_escape_fullscreen()
+        window.showFullScreen()
+    elif maximized_enabled:
+        window.showMaximized()
+    else:
+        window.show()
     return app.exec()
 
 
