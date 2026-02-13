@@ -1,19 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (
-    QFrame,
-    QGridLayout,
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 
@@ -36,7 +25,7 @@ class KpiLine(QFrame):
         row.addStretch(1)
         row.addWidget(self.value)
         row.addWidget(QLabel(unit))
-        row.addSpacing(14)
+        row.addSpacing(10)
         row.addWidget(self.status)
 
     def set_data(self, value: str, status: str) -> None:
@@ -46,18 +35,35 @@ class KpiLine(QFrame):
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
 
+    def set_scale(self, ui_scale: float) -> None:
+        base = max(9, int(12 * ui_scale))
+        self.label.setFont(QFont("Segoe UI", base, QFont.Weight.Medium))
+        self.value.setFont(QFont("Segoe UI", base + 1, QFont.Weight.Bold))
+        self.status.setFont(QFont("Segoe UI", base, QFont.Weight.Bold))
+
 
 class KpiSection(QFrame):
     def __init__(self, title: str, lines: list[KpiLine], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("SectionPanel")
+        self.lines = lines
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        head = QLabel(title)
-        head.setObjectName("SectionTitle")
-        layout.addWidget(head)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+        self.head = QLabel(title)
+        self.head.setObjectName("SectionTitle")
+        layout.addWidget(self.head)
         for line in lines:
             layout.addWidget(line)
+
+    def set_scale(self, ui_scale: float) -> None:
+        self.head.setFont(QFont("Segoe UI", max(11, int(15 * ui_scale)), QFont.Weight.Bold))
+        cast_layout = self.layout()
+        if cast_layout is not None:
+            cast_layout.setContentsMargins(int(10 * ui_scale), int(8 * ui_scale), int(10 * ui_scale), int(8 * ui_scale))
+            cast_layout.setSpacing(int(5 * ui_scale))
+        for line in self.lines:
+            line.set_scale(ui_scale)
 
 
 class TechScreen(QWidget):
@@ -65,9 +71,9 @@ class TechScreen(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(18, 18, 18, 16)
-        root.setSpacing(10)
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(14, 10, 14, 10)
+        self.root.setSpacing(8)
 
         self.kpi = {
             "battery_voltage_V": KpiLine("Tension batterie", "V"),
@@ -84,7 +90,7 @@ class TechScreen(QWidget):
             "motor_temp_C": KpiLine("Température moteur", "°C"),
         }
 
-        sections = [
+        self.sections = [
             KpiSection("Batterie / Charge", [self.kpi["battery_voltage_V"], self.kpi["battery_charge_current_A"], self.kpi["charging_state"]]),
             KpiSection("Borne", [self.kpi["station_frequency_Hz"], self.kpi["station_current_A"]]),
             KpiSection("Direction", [self.kpi["steering_pot_voltage_V"], self.kpi["steering_angle_deg"], self.kpi["steering_current_A"]]),
@@ -92,23 +98,8 @@ class TechScreen(QWidget):
             KpiSection("Température", [self.kpi["motor_temp_C"]]),
         ]
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(12)
-        for idx, sec in enumerate(sections):
-            grid.addWidget(sec, idx // 2, idx % 2)
-        root.addLayout(grid)
-
-        alert_section = QFrame()
-        alert_section.setObjectName("SectionPanel")
-        alert_layout = QVBoxLayout(alert_section)
-        title = QLabel("Alert Center")
-        title.setObjectName("SectionTitle")
-        alert_layout.addWidget(title)
-        self.alert_list = QListWidget()
-        self.alert_list.setObjectName("AlertList")
-        alert_layout.addWidget(self.alert_list)
-        root.addWidget(alert_section, 1)
+        for sec in self.sections:
+            self.root.addWidget(sec)
 
         nav = QHBoxLayout()
         nav.addStretch(1)
@@ -116,68 +107,37 @@ class TechScreen(QWidget):
         btn.setObjectName("NavButton")
         btn.clicked.connect(self.cluster_requested.emit)
         nav.addWidget(btn)
-        root.addLayout(nav)
+        self.root.addLayout(nav)
+
+        self._apply_responsive_layout()
+
+    def _apply_responsive_layout(self) -> None:
+        compact = self.width() < 1100 or self.height() < 650
+        ui_scale = 0.9 if compact else 1.0
+        self.root.setContentsMargins(int(12 * ui_scale), int(8 * ui_scale), int(12 * ui_scale), int(8 * ui_scale))
+        self.root.setSpacing(int(6 * ui_scale))
+        for sec in self.sections:
+            sec.set_scale(ui_scale)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._apply_responsive_layout()
 
     def render(self, state: VehicleTechState) -> None:
-        self.kpi["battery_voltage_V"].set_data(f"{state.battery_voltage_V:.2f}", status_battery(state.battery_voltage_V))
+        self.kpi["battery_voltage_V"].set_data(f"{state.battery_voltage_V:.2f}", "OK")
         self.kpi["battery_charge_current_A"].set_data(f"{state.battery_charge_current_A:.2f}", "OK")
-        self.kpi["charging_state"].set_data("ON" if state.charging_state else "OFF", "OK" if state.charging_state else "WARN")
+        self.kpi["charging_state"].set_data("ON" if state.charging_state else "OFF", "OK")
 
         self.kpi["station_frequency_Hz"].set_data(f"{state.station_frequency_Hz:.2f}", "OK")
-        self.kpi["station_current_A"].set_data(f"{state.station_current_A:.2f}", "OK" if state.station_current_A > 1 else "WARN")
+        self.kpi["station_current_A"].set_data(f"{state.station_current_A:.2f}", "OK")
 
-        steering_status = "WARN" if abs(state.steering_angle_deg) > 25 else "OK"
         self.kpi["steering_pot_voltage_V"].set_data(f"{state.steering_pot_voltage_V:.2f}", "OK")
-        self.kpi["steering_angle_deg"].set_data(f"{state.steering_angle_deg:.1f}", steering_status)
+        self.kpi["steering_angle_deg"].set_data(f"{state.steering_angle_deg:.1f}", "OK")
         self.kpi["steering_current_A"].set_data(f"{state.steering_current_A:.2f}", "OK")
 
-        self.kpi["speed_kmh"].set_data(f"{state.speed_kmh:.1f}", "WARN" if state.speed_kmh > 90 else "OK")
-        self.kpi["rpm"].set_data(f"{state.rpm}", "WARN" if state.rpm > 5200 else "OK")
+        self.kpi["speed_kmh"].set_data(f"{state.speed_kmh:.1f}", "OK")
+        self.kpi["rpm"].set_data(f"{state.rpm}", "OK")
         brake_active = (state.brake_state or 0.0) >= 0.5
-        self.kpi["brake_state"].set_data("ON" if brake_active else "OFF", "WARN" if brake_active else "OK")
+        self.kpi["brake_state"].set_data("ON" if brake_active else "OFF", "OK")
 
-        temp_status = "CRIT" if state.motor_temp_C >= 95 else "WARN" if state.motor_temp_C >= 85 else "OK"
-        self.kpi["motor_temp_C"].set_data(f"{state.motor_temp_C:.1f}", temp_status)
-
-        self._update_alert_center(state, temp_status)
-
-    def _update_alert_center(self, state: VehicleTechState, temp_status: str) -> None:
-        alerts: list[tuple[str, str]] = []
-        if status_battery(state.battery_voltage_V) == "CRIT":
-            alerts.append(("CRIT", "Battery voltage critically low"))
-        elif status_battery(state.battery_voltage_V) == "WARN":
-            alerts.append(("WARN", "Battery voltage below nominal"))
-
-        if temp_status == "CRIT":
-            alerts.append(("CRIT", "Motor overheat risk"))
-        elif temp_status == "WARN":
-            alerts.append(("WARN", "Motor temperature elevated"))
-
-        if abs(state.steering_angle_deg) > 28:
-            alerts.append(("WARN", "Steering angle near limit"))
-
-        if (state.brake_state or 0.0) >= 0.5:
-            alerts.append(("INFO", "Brake pressure event"))
-
-        ts = datetime.fromtimestamp(state.sample_timestamp_ms / 1000).strftime("%H:%M:%S")
-        if not alerts:
-            alerts = [("OK", "No active alert")]
-
-        self.alert_list.clear()
-        for severity, message in alerts:
-            item = QListWidgetItem(f"[{ts}] {severity} — {message}")
-            if severity == "CRIT":
-                item.setForeground(Qt.GlobalColor.red)
-            elif severity == "WARN":
-                item.setForeground(Qt.GlobalColor.yellow)
-            elif severity == "OK":
-                item.setForeground(Qt.GlobalColor.green)
-            self.alert_list.addItem(item)
-
-
-def status_battery(voltage: float) -> str:
-    if voltage < 46.0:
-        return "CRIT"
-    if voltage < 48.0:
-        return "WARN"
-    return "OK"
+        self.kpi["motor_temp_C"].set_data(f"{state.motor_temp_C:.1f}", "OK")

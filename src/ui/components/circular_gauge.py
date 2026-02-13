@@ -57,10 +57,6 @@ class CircularGauge(QWidget):
         self.update()
 
     def _status_color(self) -> QColor:
-        if self.critical_value is not None and self._value >= self.critical_value:
-            return QColor("#ff5f56")
-        if self.warning_value is not None and self._value >= self.warning_value:
-            return QColor("#ffba49")
         return QColor("#6d88ff")
 
     def _value_ratio(self, value: float) -> float:
@@ -79,11 +75,11 @@ class CircularGauge(QWidget):
 
         pad = int(12 * self._ui_scale)
         rect = self.rect().adjusted(pad, pad, -pad, -pad)
-        side_sign = -1 if self.side == "left" else 1
+        side_sign = 1 if self.side == "left" else -1
         center_f = QPointF(rect.center())
         radius = min(rect.width(), rect.height()) / 2
 
-        start_deg = 135 if self.side == "left" else 45
+        start_deg = 225 if self.side == "left" else 45
         span_deg = 270
         inward_shift = radius * 0.08 * side_sign
         hub_center = QPointF(center_f.x() + inward_shift, center_f.y())
@@ -99,20 +95,13 @@ class CircularGauge(QWidget):
         painter.setPen(QPen(QColor("#1f2a3a"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, start_deg * 16, int(-span_deg * 16))
 
-        if self.red_zone_start is not None:
-            red_ratio = self._value_ratio(self.red_zone_start)
-            red_start_deg = start_deg - span_deg * red_ratio
-            red_span_deg = span_deg * (1 - red_ratio)
-            painter.setPen(QPen(QColor("#ca3b4f"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            painter.drawArc(outer_rect, int(red_start_deg * 16), int(-red_span_deg * 16))
-
         ratio = self._value_ratio(self._value)
         value_span = span_deg * ratio
         active_grad = QConicalGradient(center_f, start_deg)
         active_grad.setColorAt(0.0, QColor("#8b9cff"))
         active_grad.setColorAt(0.5, QColor("#6488ff"))
-        active_grad.setColorAt(0.82, QColor("#8c5bff"))
-        active_grad.setColorAt(1.0, QColor("#ff6d64"))
+        active_grad.setColorAt(0.82, QColor("#5cb6ff"))
+        active_grad.setColorAt(1.0, QColor("#46d3ff"))
         painter.setPen(QPen(QBrush(active_grad), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, start_deg * 16, int(-value_span * 16))
 

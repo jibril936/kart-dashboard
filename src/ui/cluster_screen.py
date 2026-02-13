@@ -6,10 +6,10 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from src.core.state import VehicleTechState
 from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge, DriveTopIndicators
 
-MAX_SPEED_KMH = 200
-MAX_RPM = 8000
-SPEED_MAJOR_TICK = 20
-RPM_MAJOR_TICK = 1000
+MAX_SPEED_KMH = 60
+MAX_RPM = 60
+SPEED_MAJOR_TICK = 10
+RPM_MAJOR_TICK = 10
 
 
 class ClusterScreen(QWidget):
@@ -42,9 +42,6 @@ class ClusterScreen(QWidget):
             "km/h",
             0,
             MAX_SPEED_KMH,
-            warning_value=120,
-            critical_value=160,
-            red_zone_start=170,
             major_tick_step=SPEED_MAJOR_TICK,
             minor_ticks_per_major=1,
             label_formatter=lambda v: f"{int(v):d}",
@@ -53,15 +50,12 @@ class ClusterScreen(QWidget):
         self.center_panel = CenterPanel()
         self.rpm_gauge = CircularGauge(
             "RPM",
-            "x1000",
+            "rpm",
             0,
             MAX_RPM,
-            warning_value=6200,
-            critical_value=7200,
-            red_zone_start=6500,
             major_tick_step=RPM_MAJOR_TICK,
             minor_ticks_per_major=1,
-            label_formatter=lambda v: f"{max(0, int(v // 1000))}",
+            label_formatter=lambda v: f"{int(v):d}",
             side="left",
         )
 
