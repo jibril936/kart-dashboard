@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
@@ -67,7 +67,7 @@ class CenterPanel(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        rect = self.rect().adjusted(8, 8, -8, -8)
+        rect = QRectF(self.rect()).adjusted(8.0, 8.0, -8.0, -8.0)
         painter.setPen(QPen(QColor("#273547"), 1.0))
 
         panel_grad = QLinearGradient(rect.topLeft(), rect.bottomLeft())
