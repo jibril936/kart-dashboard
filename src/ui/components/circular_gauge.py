@@ -66,6 +66,12 @@ class CircularGauge(QWidget):
     def _value_ratio(self, value: float) -> float:
         return max(0.0, min(1.0, (value - self.min_value) / max(1e-5, (self.max_value - self.min_value))))
 
+    @staticmethod
+    def _i(value: float | None) -> int:
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            return 0
+        return int(round(value))
+
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
         painter = QPainter(self)
@@ -168,19 +174,19 @@ class CircularGauge(QWidget):
         painter.setPen(QColor("#8ea5be"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
         title_rect = rect.adjusted(0, int(8 * self._ui_scale), 0, 0)
-        title_rect.translate(inward_shift, 0)
+        title_rect.translate(self._i(inward_shift), 0)
         painter.drawText(title_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
 
         value_text = f"{self._value:.0f}" if self.max_value >= 100 else f"{self._value:.1f}"
         painter.setPen(QColor("#f4f8ff"))
         painter.setFont(QFont("Segoe UI", max(20, int((28 if self._compact else 31) * self._ui_scale)), QFont.Weight.Bold))
         value_rect = rect.adjusted(0, int(-4 * self._ui_scale), 0, 0)
-        value_rect.translate(inward_shift, 0)
+        value_rect.translate(self._i(inward_shift), 0)
         painter.drawText(value_rect, Qt.AlignmentFlag.AlignCenter, value_text)
 
         painter.setPen(QColor("#90a4bd"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.Medium))
         unit_y_offset = int((34 if self._compact else 40) * self._ui_scale)
         unit_rect = rect.adjusted(0, unit_y_offset, 0, 0)
-        unit_rect.translate(inward_shift, 0)
+        unit_rect.translate(self._i(inward_shift), 0)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignHCenter, self.unit)

@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--demo", action="store_true", help="Use fake data service")
     parser.add_argument("--scenario", default="normal", choices=["normal", "acceleration", "battery_drop", "overheat", "sensor_ko"])
     parser.add_argument("--ui-scale", type=float, default=1.0, help="UI scaling factor for compact displays")
+    parser.add_argument("--fullscreen", action="store_true", help="Force fullscreen mode")
     return parser.parse_args()
 
 
@@ -33,7 +34,7 @@ def main() -> int:
     window = DashboardMainWindow(ui_scale=max(0.6, min(2.0, args.ui_scale)))
     window.resize(1440, 900)
 
-    fullscreen_enabled = os.getenv("KART_FULLSCREEN") == "1"
+    fullscreen_enabled = args.fullscreen or os.getenv("KART_FULLSCREEN") == "1"
     maximized_enabled = os.getenv("KART_MAXIMIZED") == "1"
 
     store = StateStore(default_state())
