@@ -46,6 +46,16 @@ export XAUTHORITY=/home/jibril/.Xauthority
 python src/main.py --demo --scenario normal
 ```
 
+### 4) Raspberry Pi (plein écran)
+
+```bash
+cd ~/kart-dashboard
+source .venv/bin/activate
+export PYTHONPATH="$PWD"
+KART_FULLSCREEN=1 python src/main.py --demo --scenario normal
+python src/main.py --demo --scenario normal --fullscreen
+```
+
 > Adapte le chemin home si différent.
 > Si l’app est lancée depuis SSH et ne s’affiche pas, vérifier que le bureau est ouvert sur la Pi.
 

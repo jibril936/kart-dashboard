@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtGui import QCursor, QKeyEvent
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget
 
 from src.core.state import VehicleTechState
@@ -14,6 +14,7 @@ class DashboardMainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Kart Dashboard — Cluster / Tech")
         self._allow_escape_fullscreen = False
+        self._hide_cursor_in_fullscreen = False
 
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
@@ -42,9 +43,19 @@ class DashboardMainWindow(QMainWindow):
     def enable_escape_fullscreen(self) -> None:
         self._allow_escape_fullscreen = True
 
+    def set_hide_cursor_in_fullscreen(self, enabled: bool) -> None:
+        self._hide_cursor_in_fullscreen = enabled
+
+    def apply_fullscreen_cursor(self) -> None:
+        if self._hide_cursor_in_fullscreen and self.isFullScreen():
+            self.setCursor(QCursor(Qt.CursorShape.BlankCursor))
+            return
+        self.unsetCursor()
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         if self._allow_escape_fullscreen and self.isFullScreen() and event.key() == Qt.Key.Key_Escape:
             self.showNormal()
+            self.apply_fullscreen_cursor()
             event.accept()
             return
         super().keyPressEvent(event)

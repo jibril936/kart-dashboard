@@ -15,6 +15,30 @@ from src.ui.main_window import DashboardMainWindow
 from src.ui.theme import dark_theme_qss
 
 
+def _apply_window_mode(window: DashboardMainWindow, fullscreen_enabled: bool, maximized_enabled: bool) -> None:
+    if fullscreen_enabled:
+        window.showFullScreen()
+
+        def _fullscreen_fallback() -> None:
+            if window.isFullScreen():
+                window.apply_fullscreen_cursor()
+                return
+            screen = window.screen()
+            if screen is not None:
+                window.resize(screen.availableGeometry().size())
+            window.showMaximized()
+            window.apply_fullscreen_cursor()
+
+        QTimer.singleShot(150, _fullscreen_fallback)
+        return
+
+    if maximized_enabled:
+        window.showMaximized()
+        return
+
+    window.show()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Kart dashboard — Cluster + Tech")
     parser.add_argument("--demo", action="store_true", help="Use fake data service")
@@ -36,6 +60,7 @@ def main() -> int:
 
     fullscreen_enabled = args.fullscreen or os.getenv("KART_FULLSCREEN") == "1"
     maximized_enabled = os.getenv("KART_MAXIMIZED") == "1"
+    hide_cursor_enabled = os.getenv("KART_HIDE_CURSOR") == "1"
 
     store = StateStore(default_state())
     service = FakeDataService(scenario=args.scenario)
@@ -50,11 +75,9 @@ def main() -> int:
 
     if fullscreen_enabled:
         window.enable_escape_fullscreen()
-        window.showFullScreen()
-    elif maximized_enabled:
-        window.showMaximized()
-    else:
-        window.show()
+    window.set_hide_cursor_in_fullscreen(hide_cursor_enabled)
+
+    QTimer.singleShot(0, lambda: _apply_window_mode(window, fullscreen_enabled, maximized_enabled))
     return app.exec()
 
 
