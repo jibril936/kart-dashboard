@@ -8,14 +8,14 @@ from src.ui.tech_screen import TechScreen
 
 
 class DashboardMainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, ui_scale: float = 1.0) -> None:
         super().__init__()
         self.setWindowTitle("Kart Dashboard — Cluster / Tech")
 
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
 
-        self.cluster_screen = ClusterScreen()
+        self.cluster_screen = ClusterScreen(ui_scale=ui_scale)
         self.tech_screen = TechScreen()
 
         self.stack.addWidget(self.cluster_screen)

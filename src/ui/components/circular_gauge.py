@@ -35,7 +35,14 @@ class CircularGauge(QWidget):
         self.minor_ticks_per_major = max(0, minor_ticks_per_major)
         self.label_formatter = label_formatter or self._default_label_formatter
         self._value = min_value
+        self._compact = False
+        self._ui_scale = 1.0
         self.setMinimumSize(280, 280)
+
+    def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
+        self._compact = compact
+        self._ui_scale = ui_scale
+        self.update()
 
     def _default_label_formatter(self, value: float) -> str:
         if float(value).is_integer():
@@ -61,7 +68,8 @@ class CircularGauge(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        rect = self.rect().adjusted(12, 12, -12, -12)
+        pad = int(12 * self._ui_scale)
+        rect = self.rect().adjusted(pad, pad, -pad, -pad)
         center_f = QPointF(rect.center())
         radius = min(rect.width(), rect.height()) / 2
 
@@ -122,7 +130,7 @@ class CircularGauge(QWidget):
                 painter.drawLine(p1, p2)
 
             painter.setPen(QColor("#dbe8f5"))
-            painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
+            painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
             for i in range(major_count + 1):
                 value = self.min_value + self.major_tick_step * i
                 ratio_tick = i / major_count
@@ -152,14 +160,15 @@ class CircularGauge(QWidget):
         painter.drawEllipse(center_f, 3, 3)
 
         painter.setPen(QColor("#8ea5be"))
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.DemiBold))
-        painter.drawText(rect.adjusted(0, 8, 0, 0), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
+        painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
+        painter.drawText(rect.adjusted(0, int(8 * self._ui_scale), 0, 0), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
 
         value_text = f"{self._value:.0f}" if self.max_value >= 100 else f"{self._value:.1f}"
         painter.setPen(QColor("#f4f8ff"))
-        painter.setFont(QFont("Segoe UI", 31, QFont.Weight.Bold))
-        painter.drawText(rect.adjusted(0, -4, 0, 0), Qt.AlignmentFlag.AlignCenter, value_text)
+        painter.setFont(QFont("Segoe UI", max(20, int((28 if self._compact else 31) * self._ui_scale)), QFont.Weight.Bold))
+        painter.drawText(rect.adjusted(0, int(-4 * self._ui_scale), 0, 0), Qt.AlignmentFlag.AlignCenter, value_text)
 
         painter.setPen(QColor("#90a4bd"))
-        painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Medium))
-        painter.drawText(rect.adjusted(0, 72, 0, 0), Qt.AlignmentFlag.AlignHCenter, self.unit)
+        painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.Medium))
+        unit_y_offset = int((34 if self._compact else 40) * self._ui_scale)
+        painter.drawText(rect.adjusted(0, unit_y_offset, 0, 0), Qt.AlignmentFlag.AlignHCenter, self.unit)

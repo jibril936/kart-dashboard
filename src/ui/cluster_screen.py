@@ -15,25 +15,27 @@ RPM_MAJOR_TICK = 1000
 class ClusterScreen(QWidget):
     tech_requested = pyqtSignal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, ui_scale: float = 1.0, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._base_ui_scale = ui_scale
+        self._effective_scale = ui_scale
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(18, 14, 18, 12)
-        root.setSpacing(8)
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(18, 14, 18, 12)
+        self.root.setSpacing(8)
 
-        top_bar = QHBoxLayout()
-        top_bar.setSpacing(8)
+        self.top_bar = QHBoxLayout()
+        self.top_bar.setSpacing(8)
         self.top_indicators = DriveTopIndicators()
         self.tech_button = QPushButton("TECH")
         self.tech_button.setObjectName("NavButton")
         self.tech_button.clicked.connect(self.tech_requested.emit)
-        top_bar.addWidget(self.top_indicators)
-        top_bar.addWidget(self.tech_button)
-        root.addLayout(top_bar)
+        self.top_bar.addWidget(self.top_indicators)
+        self.top_bar.addWidget(self.tech_button)
+        self.root.addLayout(self.top_bar)
 
-        middle = QHBoxLayout()
-        middle.setSpacing(16)
+        self.middle = QHBoxLayout()
+        self.middle.setSpacing(16)
 
         self.speed_gauge = CircularGauge(
             "SPEED",
@@ -61,13 +63,34 @@ class ClusterScreen(QWidget):
             label_formatter=lambda v: f"{max(0, int(v // 1000))}",
         )
 
-        middle.addWidget(self.speed_gauge, 1)
-        middle.addWidget(self.center_panel, 1)
-        middle.addWidget(self.rpm_gauge, 1)
-        root.addLayout(middle, 1)
+        self.middle.addWidget(self.speed_gauge, 1)
+        self.middle.addWidget(self.center_panel, 1)
+        self.middle.addWidget(self.rpm_gauge, 1)
+        self.root.addLayout(self.middle, 1)
 
         self.bottom_bar = BottomBarStrip()
-        root.addWidget(self.bottom_bar)
+        self.root.addWidget(self.bottom_bar)
+        self._apply_responsive_layout()
+
+    def _apply_responsive_layout(self) -> None:
+        compact = self.width() < 1100 or self.height() < 650
+        auto_scale = 0.84 if compact else 1.0
+        self._effective_scale = max(0.75, min(1.2, self._base_ui_scale * auto_scale))
+        s = self._effective_scale
+
+        self.root.setContentsMargins(int(18 * s), int(14 * s), int(18 * s), int(12 * s))
+        self.root.setSpacing(int(8 * s))
+        self.middle.setSpacing(int((10 if compact else 16) * s))
+        self.top_bar.setSpacing(int((6 if compact else 8) * s))
+
+        self.center_panel.set_compact_mode(compact, s)
+        self.center_panel.kart_widget.set_compact_mode(compact, s)
+        self.speed_gauge.set_compact_mode(compact, s)
+        self.rpm_gauge.set_compact_mode(compact, s)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._apply_responsive_layout()
 
     def render(self, state: VehicleTechState) -> None:
         speed = state.speed_kmh
@@ -86,8 +109,16 @@ class ClusterScreen(QWidget):
         if rpm is not None:
             self.rpm_gauge.set_value(float(rpm))
 
-        drive_mode = None if charging is None else ("CHARGE" if charging else "DRIVE")
-        self.center_panel.set_state(float(steering_angle) if steering_angle is not None else None, mode=drive_mode, gear=None)
+        drive_mode = getattr(state, "drive_mode", None)
+        control_mode = getattr(state, "control_mode", None)
+
+        self.center_panel.set_state(
+            float(steering_angle) if steering_angle is not None else None,
+            drive_mode=drive_mode,
+            control_mode=control_mode,
+            charging_state=charging,
+            gear=None,
+        )
 
         brake_active = None if brake is None else brake >= 0.5
         self.top_indicators.set_state(
