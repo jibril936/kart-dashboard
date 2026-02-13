@@ -6,6 +6,11 @@ from PyQt6.QtWidgets import QFrame, QHBoxLayout, QSizePolicy, QWidget
 
 from src.ui.visibility import set_visible_if, value_is_present
 
+BATTERY_MIN_V = 44.0
+BATTERY_MAX_V = 54.0
+MOTOR_TEMP_MIN_C = 20.0
+MOTOR_TEMP_MAX_C = 100.0
+
 
 class _StripGauge(QWidget):
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
@@ -25,7 +30,7 @@ class _StripGauge(QWidget):
         painter.setPen(QPen(QColor("#355c95"), 1.0))
         painter.drawLine(QPointF(gauge.left(), gauge.top()), QPointF(gauge.right(), gauge.top()))
 
-        painter.setPen(QColor("#9bb5d2"))
+        painter.setPen(QColor("#c5d9f2"))
         painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
         painter.drawText(QRectF(rect.left() + 8.0, rect.top() + 2.0, rect.width() - 16.0, 12.0), Qt.AlignmentFlag.AlignLeft, self._title)
         return rect, gauge
@@ -35,26 +40,20 @@ class BatteryBar(_StripGauge):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("BATTERY", parent)
         self._voltage: float | None = None
-        self._soc_percent: float | None = None
 
     def set_data(self, voltage: float | None, soc_percent: float | None) -> None:
+        _ = soc_percent
         self._voltage = voltage
-        self._soc_percent = None if soc_percent is None else max(0.0, min(100.0, soc_percent))
         self.update()
 
     def _fill_ratio(self) -> float:
-        if self._soc_percent is None:
+        if self._voltage is None:
             return 0.0
-        return self._soc_percent / 100.0
+        return max(0.0, min(1.0, (self._voltage - BATTERY_MIN_V) / (BATTERY_MAX_V - BATTERY_MIN_V)))
 
-    def _fill_color(self) -> QColor:
-        if self._soc_percent is None:
-            return QColor("#5a6780")
-        if self._soc_percent < 20.0:
-            return QColor("#ff6d64")
-        if self._soc_percent < 45.0:
-            return QColor("#ffb347")
-        return QColor("#63c6a8")
+    @staticmethod
+    def _fill_color() -> QColor:
+        return QColor("#5bc0ff")
 
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
@@ -64,9 +63,9 @@ class BatteryBar(_StripGauge):
         rect, gauge = self._draw_shell(painter)
 
         painter.setPen(QPen(QColor("#3e5370"), 1.0))
-        for ratio in (0.0, 0.25, 0.5, 0.75, 1.0):
+        for ratio in (0.0, 0.5, 1.0):
             x = gauge.left() + ratio * gauge.width()
-            tick_h = 5.0 if ratio in (0.0, 0.5, 1.0) else 3.0
+            tick_h = 5.0 if ratio in (0.0, 1.0) else 4.0
             painter.drawLine(QPointF(x, gauge.top()), QPointF(x, gauge.top() - tick_h))
 
         fill = (gauge.width() - 2.0) * self._fill_ratio()
@@ -80,37 +79,30 @@ class BatteryBar(_StripGauge):
 
         painter.setPen(QColor("#8098b3"))
         painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 20.0, 12.0), Qt.AlignmentFlag.AlignLeft, "0")
-        painter.drawText(QRectF(gauge.center().x() - 14.0, gauge.bottom() + 2.0, 28.0, 12.0), Qt.AlignmentFlag.AlignCenter, "1/2")
-        painter.drawText(QRectF(gauge.right() - 14.0, gauge.bottom() + 2.0, 18.0, 12.0), Qt.AlignmentFlag.AlignRight, "1")
+        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignLeft, f"{BATTERY_MIN_V:.0f}")
+        painter.drawText(QRectF(gauge.right() - 26.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignRight, f"{BATTERY_MAX_V:.0f}")
 
         if self._voltage is not None:
-            value_text = f"{self._voltage:.1f} V"
-            if self._soc_percent is not None:
-                value_text = f"{self._soc_percent:.0f}%  {value_text}"
             painter.setPen(self._fill_color())
             painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            painter.drawText(QRectF(rect.left() + 100.0, gauge.bottom() + 1.0, rect.width() - 108.0, 14.0), Qt.AlignmentFlag.AlignLeft, value_text)
+            painter.drawText(QRectF(rect.left() + 100.0, gauge.bottom() + 1.0, rect.width() - 108.0, 14.0), Qt.AlignmentFlag.AlignLeft, f"{self._voltage:.1f} V")
 
 
 class TempBar(_StripGauge):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("MOTOR TEMP", parent)
-        self._temp_c: float = 0.0
+        self._temp_c: float = MOTOR_TEMP_MIN_C
 
     def set_data(self, temp_c: float) -> None:
         self._temp_c = temp_c
         self.update()
 
     def _ratio(self) -> float:
-        return max(0.0, min(1.0, (self._temp_c - 50.0) / 50.0))
+        return max(0.0, min(1.0, (self._temp_c - MOTOR_TEMP_MIN_C) / (MOTOR_TEMP_MAX_C - MOTOR_TEMP_MIN_C)))
 
-    def _color(self) -> QColor:
-        if self._temp_c >= 95.0:
-            return QColor("#ff6d64")
-        if self._temp_c >= 80.0:
-            return QColor("#ffb347")
-        return QColor("#63c6a8")
+    @staticmethod
+    def _color() -> QColor:
+        return QColor("#5bc0ff")
 
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
@@ -135,9 +127,8 @@ class TempBar(_StripGauge):
 
         painter.setPen(QColor("#8098b3"))
         painter.setFont(QFont("Segoe UI", 7, QFont.Weight.DemiBold))
-        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 24.0, 12.0), Qt.AlignmentFlag.AlignLeft, "50")
-        painter.drawText(QRectF(gauge.center().x() - 10.0, gauge.bottom() + 2.0, 20.0, 12.0), Qt.AlignmentFlag.AlignCenter, "")
-        painter.drawText(QRectF(gauge.right() - 22.0, gauge.bottom() + 2.0, 26.0, 12.0), Qt.AlignmentFlag.AlignRight, "100")
+        painter.drawText(QRectF(gauge.left() - 2.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignLeft, f"{MOTOR_TEMP_MIN_C:.0f}")
+        painter.drawText(QRectF(gauge.right() - 24.0, gauge.bottom() + 2.0, 30.0, 12.0), Qt.AlignmentFlag.AlignRight, f"{MOTOR_TEMP_MAX_C:.0f}")
 
         painter.setPen(self._color())
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))

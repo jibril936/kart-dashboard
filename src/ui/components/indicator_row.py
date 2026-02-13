@@ -31,7 +31,7 @@ class ChargingIndicator(StateIndicator):
 
 class BrakeIndicator(StateIndicator):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("BRAKE", color="#ff6d64", parent=parent)
+        super().__init__("BRAKE", color="#88bfff", parent=parent)
 
 
 class DriveTopIndicators(QWidget):
@@ -67,4 +67,4 @@ class DriveTopIndicators(QWidget):
             self.temp_label.setText(f"MTR {motor_temp_c:.0f}°C")
 
         set_visible_if(self.charging_indicator, bool(is_charging))
-        set_visible_if(self.brake_indicator, bool(brake_active))
+        set_visible_if(self.brake_indicator, False)

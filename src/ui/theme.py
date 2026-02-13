@@ -13,8 +13,8 @@ def dark_theme_qss() -> str:
         background: transparent;
     }
     QLabel#SectionTitle {
-        color: #9ab1c8;
-        font-size: 14px;
+        color: #cfe3ff;
+        font-size: 16px;
         font-weight: 700;
         letter-spacing: 0.4px;
     }
@@ -25,8 +25,8 @@ def dark_theme_qss() -> str:
         min-width: 56px;
     }
     QLabel#StatusOK { color: #53d7be; font-weight: 700; }
-    QLabel#StatusWARN { color: #ffbf58; font-weight: 700; }
-    QLabel#StatusCRIT { color: #ff6d64; font-weight: 700; }
+    QLabel#StatusWARN { color: #7dbbff; font-weight: 700; }
+    QLabel#StatusCRIT { color: #7dbbff; font-weight: 700; }
 
     QFrame#SectionPanel {
         background: rgba(12, 19, 30, 0.78);
