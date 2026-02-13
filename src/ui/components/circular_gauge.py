@@ -72,6 +72,10 @@ class CircularGauge(QWidget):
             return 0
         return int(round(value))
 
+    @staticmethod
+    def _arc16(degrees: float) -> int:
+        return int(round(degrees * 16))
+
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
         painter = QPainter(self)
@@ -96,10 +100,10 @@ class CircularGauge(QWidget):
         halo_color = self._status_color()
         halo_color.setAlpha(26)
         painter.setPen(QPen(halo_color, 30, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, start_deg * 16, int(-span_deg * 16))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-span_deg))
 
         painter.setPen(QPen(QColor("#1f2a3a"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, start_deg * 16, int(-span_deg * 16))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-span_deg))
 
         ratio = self._value_ratio(self._value)
         value_span = span_deg * ratio
@@ -109,7 +113,7 @@ class CircularGauge(QWidget):
         active_grad.setColorAt(0.82, QColor("#5cb6ff"))
         active_grad.setColorAt(1.0, QColor("#46d3ff"))
         painter.setPen(QPen(QBrush(active_grad), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, start_deg * 16, int(-value_span * 16))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-value_span))
 
         painter.setPen(QPen(QColor("#273649"), 2))
         painter.setBrush(QColor("#0f1623"))
