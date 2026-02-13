@@ -28,8 +28,8 @@ class CenterPanel(QWidget):
 
         self.angle_label = QLabel("+0.0°")
         self.angle_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.angle_label.setStyleSheet("color: #c7d8eb;")
-        self.angle_label.setFont(QFont("Segoe UI", 15, QFont.Weight.Medium))
+        self.angle_label.setStyleSheet("color: #a8f3ff; letter-spacing: 1px;")
+        self.angle_label.setFont(QFont("Bahnschrift", 15, QFont.Weight.DemiBold))
 
         root.addWidget(self.kart_widget, 1)
         root.addWidget(self.angle_label)
@@ -37,7 +37,7 @@ class CenterPanel(QWidget):
     def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
         self._compact = compact
         self._ui_scale = ui_scale
-        self.angle_label.setFont(QFont("Segoe UI", max(11, int((13 if compact else 15) * ui_scale)), QFont.Weight.Medium))
+        self.angle_label.setFont(QFont("Bahnschrift", max(11, int((13 if compact else 15) * ui_scale)), QFont.Weight.DemiBold))
 
     def set_state(
         self,
@@ -56,9 +56,9 @@ class CenterPanel(QWidget):
         self._has_steering = steering_angle_deg is not None
 
         if self._has_steering:
-            self.angle_label.setText(f"{clamped:+.1f}°")
+            self.angle_label.setText(f"∡ {clamped:+.1f}°")
         else:
-            self.angle_label.setText("--.-°")
+            self.angle_label.setText("∡ --.-°")
 
         self.kart_widget.set_steer_angle(steering_angle_deg)
 
@@ -71,9 +71,17 @@ class CenterPanel(QWidget):
         rect = QRectF(self.rect()).adjusted(8.0, 8.0, -8.0, -8.0)
         painter.setPen(QPen(QColor("#273547"), 1.0))
 
-        panel_grad = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        panel_grad.setColorAt(0.0, QColor("#0f1624"))
-        panel_grad.setColorAt(0.6, QColor("#0c1420"))
-        panel_grad.setColorAt(1.0, QColor("#09111a"))
+        panel_grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        panel_grad.setColorAt(0.0, QColor("#111c2c"))
+        panel_grad.setColorAt(0.55, QColor("#0a131f"))
+        panel_grad.setColorAt(1.0, QColor("#04080e"))
         painter.setBrush(panel_grad)
         painter.drawRoundedRect(rect, 20, 20)
+
+        painter.setPen(QPen(QColor("#41596e"), 2.0))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 16, 16)
+
+        painter.setPen(QPen(QColor(84, 233, 255, 90), 1.4))
+        painter.drawLine(rect.left() + 14, rect.top() + 12, rect.right() - 18, rect.top() + 12)
+        painter.drawLine(rect.left() + 18, rect.bottom() - 12, rect.right() - 14, rect.bottom() - 12)

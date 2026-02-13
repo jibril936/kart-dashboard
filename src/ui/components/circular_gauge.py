@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import Literal
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QBrush, QColor, QConicalGradient, QFont, QPainter, QPen, QPolygonF
+from PyQt6.QtGui import QBrush, QColor, QConicalGradient, QFont, QLinearGradient, QPainter, QPen, QPolygonF, QRadialGradient
 from PyQt6.QtWidgets import QWidget
 
 
@@ -67,7 +67,7 @@ class CircularGauge(QWidget):
         return max(self.min_value, min(self.max_value, value))
 
     def _status_color(self) -> QColor:
-        return QColor("#6d88ff")
+        return QColor("#4ee8ff")
 
     def _value_ratio(self, value: float) -> float:
         return max(0.0, min(1.0, (value - self.min_value) / max(1e-5, (self.max_value - self.min_value))))
@@ -109,30 +109,54 @@ class CircularGauge(QWidget):
         inward_shift = radius * 0.08 * side_sign
         hub_center = QPointF(center_f)
 
-        outer_rect = QRectF(center_f.x() - radius * 0.82, center_f.y() - radius * 0.82, radius * 1.64, radius * 1.64)
-        inner_ring_rect = QRectF(center_f.x() - radius * 0.56, center_f.y() - radius * 0.56, radius * 1.12, radius * 1.12)
+        outer_rect = QRectF(center_f.x() - radius * 0.84, center_f.y() - radius * 0.84, radius * 1.68, radius * 1.68)
+        inner_ring_rect = QRectF(center_f.x() - radius * 0.60, center_f.y() - radius * 0.60, radius * 1.2, radius * 1.2)
+
+        dial_bg = QRadialGradient(center_f, radius * 1.05)
+        dial_bg.setColorAt(0.0, QColor("#101d2f"))
+        dial_bg.setColorAt(0.72, QColor("#090f19"))
+        dial_bg.setColorAt(1.0, QColor("#05080d"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(dial_bg)
+        painter.drawEllipse(QRectF(center_f.x() - radius * 0.90, center_f.y() - radius * 0.90, radius * 1.8, radius * 1.8))
+
+        painter.setPen(QPen(QColor("#5f6d77"), 6.5))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
+
+        for ratio_bolt in (0.08, 0.24, 0.42, 0.58, 0.76, 0.92):
+            ang = math.radians(self._ratio_to_angle(ratio_bolt))
+            bx = center_f.x() + math.cos(ang) * radius * 0.87
+            by = center_f.y() - math.sin(ang) * radius * 0.87
+            painter.setPen(QPen(QColor("#8e99a3"), 1.0))
+            painter.setBrush(QColor("#272d33"))
+            painter.drawEllipse(QPointF(bx, by), radius * 0.018, radius * 0.018)
 
         halo_color = self._status_color()
         halo_color.setAlpha(26)
-        painter.setPen(QPen(halo_color, 30, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setPen(QPen(halo_color, 36, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
 
-        painter.setPen(QPen(QColor("#1f2a3a"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setPen(QPen(QColor("#1e2d3f"), 15, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
 
         clamped_value = self._clamp_value(self._value)
         ratio = self._value_to_ratio(clamped_value)
         value_span = span_sign * ratio
         active_grad = QConicalGradient(center_f, start_deg)
-        active_grad.setColorAt(0.0, QColor("#8b9cff"))
-        active_grad.setColorAt(0.5, QColor("#6488ff"))
-        active_grad.setColorAt(0.82, QColor("#5cb6ff"))
-        active_grad.setColorAt(1.0, QColor("#46d3ff"))
-        painter.setPen(QPen(QBrush(active_grad), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        active_grad.setColorAt(0.0, QColor("#2f74ff"))
+        active_grad.setColorAt(0.55, QColor("#00d4ff"))
+        active_grad.setColorAt(1.0, QColor("#f2fdff"))
+        painter.setPen(QPen(QBrush(active_grad), 15, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(value_span))
 
-        painter.setPen(QPen(QColor("#273649"), 2))
-        painter.setBrush(QColor("#0f1623"))
+        painter.setPen(QPen(QColor(164, 248, 255, 90), 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(value_span))
+
+        glass = QLinearGradient(inner_ring_rect.topLeft(), inner_ring_rect.bottomLeft())
+        glass.setColorAt(0.0, QColor("#18283d"))
+        glass.setColorAt(1.0, QColor("#0d1522"))
+        painter.setPen(QPen(QColor("#36506f"), 2))
+        painter.setBrush(glass)
         painter.drawEllipse(inner_ring_rect)
 
         painter.setPen(QPen(QColor("#304863"), 1))
@@ -152,12 +176,12 @@ class CircularGauge(QWidget):
                 r2 = radius * (0.82 if is_major else 0.80)
                 p1 = QPointF(center_f.x() + math.cos(ang) * r1, center_f.y() - math.sin(ang) * r1)
                 p2 = QPointF(center_f.x() + math.cos(ang) * r2, center_f.y() - math.sin(ang) * r2)
-                tick_color = QColor("#bdcad8") if is_major else QColor("#4a5d73")
+                tick_color = QColor("#dbf4ff") if is_major else QColor("#4f7394")
                 painter.setPen(QPen(tick_color, 1.8 if is_major else 1.1))
                 painter.drawLine(p1, p2)
 
-            painter.setPen(QColor("#dbe8f5"))
-            painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
+            painter.setPen(QColor("#b3ebff"))
+            painter.setFont(QFont("Bahnschrift", max(7, int((8 if self._compact else 10) * self._ui_scale)), QFont.Weight.Bold))
             for i in range(major_count + 1):
                 value = self.min_value + self.major_tick_step * i
                 ratio_tick = i / major_count
@@ -167,21 +191,25 @@ class CircularGauge(QWidget):
                 label_rect = QRectF(label_point.x() - 15, label_point.y() - 9, 30, 18)
                 painter.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), self.label_formatter(value))
 
-        painter.setPen(QColor("#8ea5be"))
-        painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
+        painter.setPen(QColor("#95edff"))
+        painter.setFont(QFont("Bahnschrift", max(7, int((8 if self._compact else 10) * self._ui_scale)), QFont.Weight.DemiBold))
         title_rect = rect.adjusted(0, int(8 * self._ui_scale), 0, 0)
         title_rect.translate(self._i(inward_shift), 0)
-        painter.drawText(title_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
+        painter.drawText(title_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, f"◉ {self.title}")
 
         value_text = f"{self._value:.0f}"
-        painter.setPen(QColor("#f4f8ff"))
-        painter.setFont(QFont("Segoe UI", max(20, int((28 if self._compact else 31) * self._ui_scale)), QFont.Weight.Bold))
+        painter.setPen(QColor(135, 236, 255, 90))
+        painter.setFont(QFont("Bahnschrift", max(20, int((30 if self._compact else 34) * self._ui_scale)), QFont.Weight.Bold))
+        glow_rect = rect.adjusted(2, int(-7 * self._ui_scale), 2, 0)
+        glow_rect.translate(self._i(inward_shift), 0)
+        painter.drawText(glow_rect, Qt.AlignmentFlag.AlignCenter, value_text)
+        painter.setPen(QColor("#efffff"))
         value_rect = rect.adjusted(0, int(-9 * self._ui_scale), 0, 0)
         value_rect.translate(self._i(inward_shift), 0)
         painter.drawText(value_rect, Qt.AlignmentFlag.AlignCenter, value_text)
 
-        painter.setPen(QColor("#90a4bd"))
-        painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.Medium))
+        painter.setPen(QColor("#9ed9ea"))
+        painter.setFont(QFont("Bahnschrift", max(7, int((8 if self._compact else 10) * self._ui_scale)), QFont.Weight.Medium))
         unit_y_offset = int((26 if self._compact else 30) * self._ui_scale)
         unit_rect = rect.adjusted(0, unit_y_offset, 0, 0)
         unit_rect.translate(self._i(inward_shift), 0)
@@ -197,12 +225,12 @@ class CircularGauge(QWidget):
         needle_tip = QPointF(hub_center.x() + axis_vec.x() * pointer_radius, hub_center.y() + axis_vec.y() * pointer_radius)
         needle_tail = QPointF(hub_center.x() - axis_vec.x() * counter_radius, hub_center.y() - axis_vec.y() * counter_radius)
 
-        needle_glow = QColor("#89f7ff")
+        needle_glow = QColor("#62f0ff")
         needle_glow.setAlpha(82)
         painter.setPen(QPen(needle_glow, 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawLine(needle_tail, needle_tip)
 
-        needle_color = QColor("#d8fcff")
+        needle_color = QColor("#f6feff")
         painter.setPen(QPen(needle_color, 3.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawLine(needle_tail, needle_tip)
 
@@ -219,7 +247,7 @@ class CircularGauge(QWidget):
             ]
         )
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#f1fdff"))
+        painter.setBrush(QColor("#bfffff"))
         painter.drawPolygon(tip_polygon)
 
         if counter_radius > 0:
