@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, QPropertyAnimation, Qt, pyqtProperty
+from PyQt6.QtCore import QPointF, QPropertyAnimation, QRectF, Qt, pyqtProperty
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QWidget
 
@@ -68,62 +68,94 @@ class CenterPanel(QWidget):
             painter.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
             painter.drawText(top_bar.adjusted(0, 0, -14, 0), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._gear)
 
-        stage = rect.adjusted(24, 78, -24, -40)
+        stage = rect.adjusted(24, 78, -24, -38)
         stage_path = QPainterPath()
-        stage_path.moveTo(stage.left() + 20, stage.bottom())
-        stage_path.lineTo(stage.left() + 55, stage.top() + 18)
-        stage_path.lineTo(stage.right() - 55, stage.top() + 18)
-        stage_path.lineTo(stage.right() - 20, stage.bottom())
+        stage_path.moveTo(stage.left() + 18, stage.bottom())
+        stage_path.lineTo(stage.left() + 54, stage.top() + 14)
+        stage_path.lineTo(stage.right() - 54, stage.top() + 14)
+        stage_path.lineTo(stage.right() - 18, stage.bottom())
         stage_path.closeSubpath()
 
         grad = QLinearGradient(stage.topLeft().toPointF(), stage.bottomLeft().toPointF())
-        grad.setColorAt(0.0, QColor("#2e4fb0"))
-        grad.setColorAt(0.5, QColor("#14366c"))
-        grad.setColorAt(1.0, QColor("#0a1731"))
+        grad.setColorAt(0.0, QColor("#3456b8"))
+        grad.setColorAt(0.45, QColor("#1c407f"))
+        grad.setColorAt(1.0, QColor("#0a1d42"))
         painter.setPen(QPen(QColor("#3d63a7"), 1.2))
         painter.setBrush(grad)
         painter.drawPath(stage_path)
 
-        halo_center = QPointF(center.x(), stage.center().y() + 36)
+        halo_center = QPointF(center.x(), stage.center().y() + 30)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(129, 162, 255, 36))
-        painter.drawEllipse(halo_center, 74, 22)
-        painter.setBrush(QColor(194, 211, 255, 75))
-        painter.drawEllipse(halo_center, 36, 10)
+        painter.drawEllipse(halo_center, 78, 22)
+        painter.setBrush(QColor(194, 211, 255, 64))
+        painter.drawEllipse(halo_center, 42, 12)
 
-        kart_center = QPointF(center.x(), stage.center().y() + 2)
-
-        # Châssis du kart (reste fixe au centre)
-        painter.save()
-        painter.translate(kart_center)
-        painter.setPen(QPen(QColor("#3f5f8b"), 1.4))
-        painter.setBrush(QColor("#101a29"))
-        painter.drawRoundedRect(-38, -26, 76, 88, 20, 20)
-        painter.setBrush(QColor("#1d2f49"))
-        painter.drawRoundedRect(-14, -6, 28, 20, 6, 6)
-        painter.setBrush(QColor("#132840"))
-        painter.drawRoundedRect(-18, 22, 36, 22, 7, 7)
-        painter.setPen(QPen(QColor("#5e7ea8"), 2.0))
-        painter.drawLine(QPointF(-28, -4), QPointF(28, -4))
-        painter.restore()
-
-        # Roues arrière fixes
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#0c121e"))
-        rear_left_x = int(round(kart_center.x() - 52))
-        rear_right_x = int(round(kart_center.x() + 40))
-        rear_y = int(round(kart_center.y() + 22))
-        painter.drawRoundedRect(rear_left_x, rear_y, 12, 30, 4, 4)
-        painter.drawRoundedRect(rear_right_x, rear_y, 12, 30, 4, 4)
-
-        # Roues avant orientables en fonction de l'angle
-        self._draw_steering_wheel(painter, QPointF(kart_center.x() - 46, kart_center.y() - 26), self._display_angle_deg)
-        self._draw_steering_wheel(painter, QPointF(kart_center.x() + 46, kart_center.y() - 26), self._display_angle_deg)
+        kart_center = QPointF(center.x(), stage.center().y() + 4)
+        self._draw_kart(painter, kart_center)
 
         if self._has_steering:
             painter.setPen(QColor("#d8e6f6"))
             painter.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
             painter.drawText(rect.adjusted(0, 0, 0, -8), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, f"{self._display_angle_deg:+.1f}°")
+
+    def _draw_kart(self, painter: QPainter, center: QPointF) -> None:
+        painter.save()
+        painter.translate(center)
+
+        painter.setPen(QPen(QColor("#2f4f7e"), 1.5))
+        painter.setBrush(QColor("#0f1a2b"))
+
+        chassis = QPainterPath()
+        chassis.moveTo(-18, -86)
+        chassis.lineTo(18, -86)
+        chassis.quadTo(32, -72, 32, -56)
+        chassis.lineTo(32, 12)
+        chassis.quadTo(26, 36, 14, 58)
+        chassis.quadTo(4, 72, 0, 74)
+        chassis.quadTo(-4, 72, -14, 58)
+        chassis.quadTo(-26, 36, -32, 12)
+        chassis.lineTo(-32, -56)
+        chassis.quadTo(-32, -72, -18, -86)
+        painter.drawPath(chassis)
+
+        painter.setPen(QPen(QColor("#3e689d"), 1.2))
+        painter.setBrush(QColor("#172841"))
+        seat = QPainterPath()
+        seat.moveTo(-16, -8)
+        seat.quadTo(-24, -34, -8, -52)
+        seat.quadTo(0, -58, 8, -52)
+        seat.quadTo(24, -34, 16, -8)
+        seat.quadTo(12, 12, 0, 18)
+        seat.quadTo(-12, 12, -16, -8)
+        painter.drawPath(seat)
+
+        painter.setBrush(QColor("#11253e"))
+        painter.drawRoundedRect(QRectF(-19, 22, 38, 30), 9, 9)
+        painter.setBrush(QColor("#0b1728"))
+        painter.drawRoundedRect(QRectF(-13, 28, 26, 18), 7, 7)
+
+        painter.setBrush(QColor("#0f1724"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(QRectF(-46, -62, 16, 38), 5, 5)
+        painter.drawRoundedRect(QRectF(30, -62, 16, 38), 5, 5)
+        painter.drawRoundedRect(QRectF(-46, 12, 16, 38), 5, 5)
+        painter.drawRoundedRect(QRectF(30, 12, 16, 38), 5, 5)
+
+        painter.setPen(QPen(QColor("#3c5b84"), 2.0))
+        painter.drawLine(QPointF(-30, -43), QPointF(30, -43))
+        painter.drawLine(QPointF(-30, 30), QPointF(30, 30))
+
+        self._draw_steering_wheel(painter, QPointF(-38, -74), self._display_angle_deg)
+        self._draw_steering_wheel(painter, QPointF(38, -74), self._display_angle_deg)
+
+        painter.setPen(QPen(QColor("#4e76ad"), 1.8))
+        painter.setBrush(QColor("#111f34"))
+        painter.drawEllipse(QPointF(0, 0), 21, 15)
+        painter.setPen(QPen(QColor("#41628f"), 1.2))
+        painter.drawLine(QPointF(-13, 0), QPointF(13, 0))
+        painter.drawLine(QPointF(0, -9), QPointF(0, 9))
+        painter.restore()
 
     def _draw_steering_wheel(self, painter: QPainter, center: QPointF, angle_deg: float) -> None:
         painter.save()
