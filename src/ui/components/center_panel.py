@@ -110,8 +110,11 @@ class CenterPanel(QWidget):
         # Roues arrière fixes
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor("#0c121e"))
-        painter.drawRoundedRect(kart_center.x() - 52, kart_center.y() + 22, 12, 30, 4, 4)
-        painter.drawRoundedRect(kart_center.x() + 40, kart_center.y() + 22, 12, 30, 4, 4)
+        rear_left_x = int(round(kart_center.x() - 52))
+        rear_right_x = int(round(kart_center.x() + 40))
+        rear_y = int(round(kart_center.y() + 22))
+        painter.drawRoundedRect(rear_left_x, rear_y, 12, 30, 4, 4)
+        painter.drawRoundedRect(rear_right_x, rear_y, 12, 30, 4, 4)
 
         # Roues avant orientables en fonction de l'angle
         self._draw_steering_wheel(painter, QPointF(kart_center.x() - 46, kart_center.y() - 26), self._display_angle_deg)
