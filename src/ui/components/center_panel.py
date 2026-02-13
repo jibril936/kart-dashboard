@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtCore import QLineF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
@@ -83,5 +83,5 @@ class CenterPanel(QWidget):
         painter.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 16, 16)
 
         painter.setPen(QPen(QColor(84, 233, 255, 90), 1.4))
-        painter.drawLine(rect.left() + 14, rect.top() + 12, rect.right() - 18, rect.top() + 12)
-        painter.drawLine(rect.left() + 18, rect.bottom() - 12, rect.right() - 14, rect.bottom() - 12)
+        painter.drawLine(QLineF(rect.left() + 14.0, rect.top() + 12.0, rect.right() - 18.0, rect.top() + 12.0))
+        painter.drawLine(QLineF(rect.left() + 18.0, rect.bottom() - 12.0, rect.right() - 14.0, rect.bottom() - 12.0))
