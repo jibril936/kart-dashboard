@@ -78,7 +78,7 @@ class KartTopViewWidget(QWidget):
         glow.setColorAt(1.0, QColor(0, 240, 255, 0))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(glow)
-        painter.drawEllipse(r.center(), r.width() * 0.36, r.height() * 0.36)
+        painter.drawEllipse(QPointF(r.center()), r.width() * 0.36, r.height() * 0.36)
 
         self._draw_kart(painter, QRectF(r))
 
