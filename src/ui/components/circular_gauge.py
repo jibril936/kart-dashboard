@@ -41,7 +41,10 @@ class CircularGauge(QWidget):
         self._compact = False
         self._ui_scale = 1.0
         self._base_min_size = 280
-        self._gap_angle_deg = 82
+        self._start_angle_deg = 225.0
+        self._sweep_angle_deg = 270.0
+        # In this widget coordinate system, a negative delta rotates clockwise.
+        self._direction = -1.0
         self.setMinimumSize(280, 280)
 
     def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
@@ -76,6 +79,16 @@ class CircularGauge(QWidget):
     def _arc16(degrees: float) -> int:
         return int(round(degrees * 16))
 
+    def _value_to_ratio(self, value: float) -> float:
+        return self._value_ratio(value)
+
+    def _ratio_to_angle(self, ratio: float) -> float:
+        clamped_ratio = max(0.0, min(1.0, ratio))
+        return self._start_angle_deg + self._direction * clamped_ratio * self._sweep_angle_deg
+
+    def _value_to_angle(self, value: float) -> float:
+        return self._ratio_to_angle(self._value_to_ratio(value))
+
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event
         painter = QPainter(self)
@@ -87,10 +100,9 @@ class CircularGauge(QWidget):
         center_f = QPointF(rect.center())
         radius = min(rect.width(), rect.height()) / 2
 
-        gap_center_deg = 0 if self.side == "right" else 180
-        gap_half = self._gap_angle_deg / 2.0
-        start_deg = gap_center_deg + gap_half
-        span_deg = 360 - self._gap_angle_deg
+        start_deg = self._start_angle_deg
+        span_deg = self._sweep_angle_deg
+        span_sign = self._direction * span_deg
         inward_shift = radius * 0.08 * side_sign
         hub_center = QPointF(center_f.x() + inward_shift, center_f.y())
 
@@ -100,20 +112,20 @@ class CircularGauge(QWidget):
         halo_color = self._status_color()
         halo_color.setAlpha(26)
         painter.setPen(QPen(halo_color, 30, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-span_deg))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
 
         painter.setPen(QPen(QColor("#1f2a3a"), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-span_deg))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(span_sign))
 
-        ratio = self._value_ratio(self._value)
-        value_span = span_deg * ratio
+        ratio = self._value_to_ratio(self._value)
+        value_span = span_sign * ratio
         active_grad = QConicalGradient(center_f, start_deg)
         active_grad.setColorAt(0.0, QColor("#8b9cff"))
         active_grad.setColorAt(0.5, QColor("#6488ff"))
         active_grad.setColorAt(0.82, QColor("#5cb6ff"))
         active_grad.setColorAt(1.0, QColor("#46d3ff"))
         painter.setPen(QPen(QBrush(active_grad), 13, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(-value_span))
+        painter.drawArc(outer_rect, self._arc16(start_deg), self._arc16(value_span))
 
         painter.setPen(QPen(QColor("#273649"), 2))
         painter.setBrush(QColor("#0f1623"))
@@ -130,7 +142,7 @@ class CircularGauge(QWidget):
 
             for i in range(minor_count + 1):
                 ratio_tick = i / minor_count
-                ang = math.radians(start_deg - (span_deg * ratio_tick))
+                ang = math.radians(self._ratio_to_angle(ratio_tick))
                 is_major = i % (self.minor_ticks_per_major + 1) == 0
                 r1 = radius * (0.72 if is_major else 0.75)
                 r2 = radius * (0.82 if is_major else 0.80)
@@ -145,13 +157,13 @@ class CircularGauge(QWidget):
             for i in range(major_count + 1):
                 value = self.min_value + self.major_tick_step * i
                 ratio_tick = i / major_count
-                ang = math.radians(start_deg - (span_deg * ratio_tick))
+                ang = math.radians(self._ratio_to_angle(ratio_tick))
                 rl = radius * 0.64
                 label_point = QPointF(center_f.x() + math.cos(ang) * rl, center_f.y() - math.sin(ang) * rl)
                 label_rect = QRectF(label_point.x() - 15, label_point.y() - 9, 30, 18)
                 painter.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), self.label_formatter(value))
 
-        pointer_deg = start_deg - value_span
+        pointer_deg = self._value_to_angle(self._value)
         pointer_rad = math.radians(pointer_deg)
         pointer_end = QPointF(
             hub_center.x() + math.cos(pointer_rad) * radius * 0.62,
