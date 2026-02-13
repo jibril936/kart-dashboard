@@ -72,17 +72,3 @@ python -c "import PyQt6; print('PyQt6 OK')"
 ```bash
 git pull
 ```
-
-## Test manuel (validation Pi/PC)
-
-Après le correctif du gauge, vérifier le lancement et la fermeture propre :
-
-```bash
-source .venv/bin/activate
-export PYTHONPATH="$PWD"
-python src/main.py --demo --scenario normal
-python src/main.py --demo --scenario acceleration
-```
-
-> Vérifier visuellement l’absence de crash au lancement, puis fermer l’app proprement (croix fenêtre / Alt+F4 / Ctrl+C selon le mode de lancement).
-
