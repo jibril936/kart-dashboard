@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Kart dashboard — Cluster + Tech")
     parser.add_argument("--demo", action="store_true", help="Use fake data service")
     parser.add_argument("--scenario", default="normal", choices=["normal", "acceleration", "battery_drop", "overheat", "sensor_ko"])
+    parser.add_argument("--ui-scale", type=float, default=1.0, help="UI scaling factor for compact displays")
     return parser.parse_args()
 
 
@@ -28,7 +29,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setStyleSheet(dark_theme_qss())
 
-    window = DashboardMainWindow()
+    window = DashboardMainWindow(ui_scale=max(0.6, min(2.0, args.ui_scale)))
     window.resize(1440, 900)
 
     store = StateStore(default_state())
