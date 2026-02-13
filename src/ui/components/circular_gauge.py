@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from typing import Literal
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QConicalGradient, QFont, QPainter, QPen
@@ -21,6 +22,7 @@ class CircularGauge(QWidget):
         major_tick_step: float | None = None,
         minor_ticks_per_major: int = 3,
         label_formatter: Callable[[float], str] | None = None,
+        side: Literal["left", "right"] = "left",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -34,6 +36,7 @@ class CircularGauge(QWidget):
         self.major_tick_step = major_tick_step
         self.minor_ticks_per_major = max(0, minor_ticks_per_major)
         self.label_formatter = label_formatter or self._default_label_formatter
+        self.side: Literal["left", "right"] = side
         self._value = min_value
         self._compact = False
         self._ui_scale = 1.0
@@ -70,11 +73,14 @@ class CircularGauge(QWidget):
 
         pad = int(12 * self._ui_scale)
         rect = self.rect().adjusted(pad, pad, -pad, -pad)
+        side_sign = -1 if self.side == "left" else 1
         center_f = QPointF(rect.center())
         radius = min(rect.width(), rect.height()) / 2
 
-        start_deg = 135
+        start_deg = 135 if self.side == "left" else 45
         span_deg = 270
+        inward_shift = radius * 0.08 * side_sign
+        hub_center = QPointF(center_f.x() + inward_shift, center_f.y())
 
         outer_rect = QRectF(center_f.x() - radius * 0.82, center_f.y() - radius * 0.82, radius * 1.64, radius * 1.64)
         inner_ring_rect = QRectF(center_f.x() - radius * 0.56, center_f.y() - radius * 0.56, radius * 1.12, radius * 1.12)
@@ -143,32 +149,38 @@ class CircularGauge(QWidget):
         pointer_deg = start_deg - value_span
         pointer_rad = math.radians(pointer_deg)
         pointer_end = QPointF(
-            center_f.x() + math.cos(pointer_rad) * radius * 0.62,
-            center_f.y() - math.sin(pointer_rad) * radius * 0.62,
+            hub_center.x() + math.cos(pointer_rad) * radius * 0.62,
+            hub_center.y() - math.sin(pointer_rad) * radius * 0.62,
         )
         painter.setPen(QPen(QColor("#f4f9ff"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(center_f, pointer_end)
+        painter.drawLine(hub_center, pointer_end)
 
         hub_glow = QColor("#7b95ff")
         hub_glow.setAlpha(80)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(hub_glow)
-        painter.drawEllipse(center_f, 12, 12)
+        painter.drawEllipse(hub_center, 12, 12)
         painter.setBrush(QColor("#dce7f5"))
-        painter.drawEllipse(center_f, 7, 7)
+        painter.drawEllipse(hub_center, 7, 7)
         painter.setBrush(QColor("#2e3f57"))
-        painter.drawEllipse(center_f, 3, 3)
+        painter.drawEllipse(hub_center, 3, 3)
 
         painter.setPen(QColor("#8ea5be"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.DemiBold))
-        painter.drawText(rect.adjusted(0, int(8 * self._ui_scale), 0, 0), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
+        title_rect = rect.adjusted(0, int(8 * self._ui_scale), 0, 0)
+        title_rect.translate(inward_shift, 0)
+        painter.drawText(title_rect, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.title)
 
         value_text = f"{self._value:.0f}" if self.max_value >= 100 else f"{self._value:.1f}"
         painter.setPen(QColor("#f4f8ff"))
         painter.setFont(QFont("Segoe UI", max(20, int((28 if self._compact else 31) * self._ui_scale)), QFont.Weight.Bold))
-        painter.drawText(rect.adjusted(0, int(-4 * self._ui_scale), 0, 0), Qt.AlignmentFlag.AlignCenter, value_text)
+        value_rect = rect.adjusted(0, int(-4 * self._ui_scale), 0, 0)
+        value_rect.translate(inward_shift, 0)
+        painter.drawText(value_rect, Qt.AlignmentFlag.AlignCenter, value_text)
 
         painter.setPen(QColor("#90a4bd"))
         painter.setFont(QFont("Segoe UI", max(7, int((8 if self._compact else 9) * self._ui_scale)), QFont.Weight.Medium))
         unit_y_offset = int((34 if self._compact else 40) * self._ui_scale)
-        painter.drawText(rect.adjusted(0, unit_y_offset, 0, 0), Qt.AlignmentFlag.AlignHCenter, self.unit)
+        unit_rect = rect.adjusted(0, unit_y_offset, 0, 0)
+        unit_rect.translate(inward_shift, 0)
+        painter.drawText(unit_rect, Qt.AlignmentFlag.AlignHCenter, self.unit)
