@@ -71,6 +71,10 @@ python src/main.py --demo --scenario overheat
 python src/main.py --demo --scenario sensor_ko
 ```
 
+## Documentation UI
+
+- CLUSTER (page 1) + speed gauge (vendor/wrapper/fallback): `docs/ui/cluster.md`
+
 ## Debug rapide
 
 ```bash

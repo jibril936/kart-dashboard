@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
@@ -7,6 +9,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge
+from src.ui.components.speed_gauge_oem import SpeedGaugeOEM
 
 SPEED_MIN_KMH = 0
 SPEED_MAX_KMH = 60
@@ -41,16 +44,27 @@ class ClusterScreen(QWidget):
         self.middle = QHBoxLayout()
         self.middle.setSpacing(16)
 
-        self.speed_gauge = CircularGauge(
-            "SPEED",
-            "km/h",
-            SPEED_MIN_KMH,
-            SPEED_MAX_KMH,
-            major_tick_step=SPEED_MAJOR_TICK,
-            minor_ticks_per_major=1,
-            label_formatter=lambda v: f"{int(v):d}",
-            side="right",
-        )
+        gauge_impl = os.getenv("KART_SPEED_GAUGE_IMPL", "oem").lower()
+        if gauge_impl == "legacy":
+            self.speed_gauge = CircularGauge(
+                "SPEED",
+                "km/h",
+                SPEED_MIN_KMH,
+                SPEED_MAX_KMH,
+                major_tick_step=SPEED_MAJOR_TICK,
+                minor_ticks_per_major=1,
+                label_formatter=lambda v: f"{int(v):d}",
+                side="right",
+            )
+        else:
+            self.speed_gauge = SpeedGaugeOEM(
+                "SPEED",
+                "km/h",
+                SPEED_MIN_KMH,
+                SPEED_MAX_KMH,
+                major_tick_step=SPEED_MAJOR_TICK,
+                minor_ticks_per_major=1,
+            )
         self.center_panel = CenterPanel()
 
         self.middle.addWidget(self.speed_gauge, 1)
