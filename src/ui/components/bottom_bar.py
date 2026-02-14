@@ -10,31 +10,39 @@ class BottomBar(QWidget):
         self.setStyleSheet(
             """
             QWidget {
-                background-color: #141b24;
-                border: 1px solid #2c3e50;
-                border-radius: 12px;
+                background-color: #121a22;
+                border-top: 2px solid #2c3e50;
+                border-radius: 0px;
             }
             QLabel {
                 color: #D8F7FF;
                 background: transparent;
                 border: none;
                 font-family: Arial, sans-serif;
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 700;
             }
             """
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 8, 14, 8)
-        layout.setSpacing(14)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
 
-        self.motor_temp_label = QLabel("MOTEUR : --°C")
-        self.motor_temp_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        self.battery_temp_label = QLabel("BATTERIE : --°C")
-        self.battery_temp_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        self.motor_temp_label = QLabel("MOTEUR  --°C")
+        self.motor_temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.motor_temp_label.setStyleSheet(
+            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
+        )
+
+        self.battery_temp_label = QLabel("BATTERIE  --°C")
+        self.battery_temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.battery_temp_label.setStyleSheet(
+            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
+        )
         self.warning_label = QLabel("")
         self.warning_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.warning_label.setStyleSheet("font-size: 18px; font-weight: 800; color: #D8F7FF;")
 
         layout.addWidget(self.motor_temp_label, 1)
         layout.addWidget(self.battery_temp_label, 1)
@@ -44,11 +52,16 @@ class BottomBar(QWidget):
         motor = float(motor_temp)
         battery = float(battery_temp)
 
-        self.motor_temp_label.setText(f"MOTEUR : {motor:.0f}°C")
-        self.battery_temp_label.setText(f"BATTERIE : {battery:.0f}°C")
+        self.motor_temp_label.setText(f"MOTEUR  {motor:.0f}°C")
+        self.battery_temp_label.setText(f"BATTERIE  {battery:.0f}°C")
 
         motor_color = "#FF3333" if motor > 90.0 else "#D8F7FF"
-        self.motor_temp_label.setStyleSheet(f"font-size: 22px; font-weight: 700; color: {motor_color};")
+        self.motor_temp_label.setStyleSheet(
+            f"font-size: 18px; font-weight: 700; color: {motor_color}; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
+        )
+        self.battery_temp_label.setStyleSheet(
+            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
+        )
 
     def update_warning(self, warnings: list[str]) -> None:
         if warnings:
