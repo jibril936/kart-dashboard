@@ -10,22 +10,35 @@ class EnergyWidget(QWidget):
         self._voltage = 0.0
         self._current = 0.0
 
-        self.setStyleSheet("background-color: #1a2634; border-radius: 15px; border: 1px solid #2c3e50;")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            """
+            QWidget {
+                background-color: #1a2634;
+                border-radius: 12px;
+                border: 1px solid #2c3e50;
+            }
+            QLabel {
+                background-color: transparent;
+                border: none;
+            }
+            """
+        )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
 
         battery_title = QLabel("BATTERIE")
         battery_title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         battery_title.setStyleSheet(
-            "font-family: Arial, sans-serif; font-size: 10px; font-weight: 600; color: #afc0d4; border: none; background: transparent;"
+            "font-family: Arial, sans-serif; font-size: 9px; font-weight: 600; color: #8a9bad; border: none; background: transparent;"
         )
 
         self.voltage_label = QLabel("52.0 V")
         self.voltage_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.voltage_label.setStyleSheet(
-            "font-family: Arial, sans-serif; font-size: 44px; font-weight: 800; color: #ffffff; border: none; background: transparent;"
+            "font-family: Arial, sans-serif; font-size: 28px; font-weight: 800; color: #ffffff; border: none; background: transparent;"
         )
 
         self.voltage_bar = QProgressBar()
@@ -41,19 +54,19 @@ class EnergyWidget(QWidget):
         power_title = QLabel("PUISSANCE")
         power_title.setAlignment(Qt.AlignmentFlag.AlignLeft)
         power_title.setStyleSheet(
-            "font-family: Arial, sans-serif; font-size: 10px; font-weight: 600; color: #afc0d4; border: none; background: transparent;"
+            "font-family: Arial, sans-serif; font-size: 9px; font-weight: 600; color: #8a9bad; border: none; background: transparent;"
         )
 
         self.power_label = QLabel("0.00 kW")
         self.power_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.power_label.setStyleSheet(
-            "font-family: Arial, sans-serif; font-size: 30px; font-weight: 800; color: #ffffff; border: none; background: transparent;"
+            "font-family: Arial, sans-serif; font-size: 34px; font-weight: 800; color: #ffffff; border: none; background: transparent;"
         )
 
         self.current_label = QLabel("+0 A")
         self.current_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.current_label.setStyleSheet(
-            "font-family: Arial, sans-serif; font-size: 20px; font-weight: 600; color: #9daec0; border: none; background: transparent;"
+            "font-family: Arial, sans-serif; font-size: 18px; font-weight: 600; color: #8a9bad; border: none; background: transparent;"
         )
 
         power_row = QFrame()
@@ -99,7 +112,7 @@ class EnergyWidget(QWidget):
         layout.addWidget(power_row)
         layout.addWidget(bidirectional)
 
-        self._set_voltage_bar_color("#00FFFF")
+        self._set_voltage_bar_color("#2ecc71")
         self._set_power_bar_colors("#FFAA00", "#00FFFF")
 
     def _set_voltage_bar_color(self, color: str) -> None:
@@ -167,9 +180,9 @@ class EnergyWidget(QWidget):
         elif self._voltage <= 48.0:
             voltage_color = "#FFAA00"
         else:
-            voltage_color = "#00FFFF"
+            voltage_color = "#2ecc71"
         self.voltage_label.setStyleSheet(
-            f"font-family: Arial, sans-serif; font-size: 44px; font-weight: 800; color: {voltage_color}; border: none; background: transparent;"
+            f"font-family: Arial, sans-serif; font-size: 28px; font-weight: 800; color: {voltage_color}; border: none; background: transparent;"
         )
         self._set_voltage_bar_color(voltage_color)
 
@@ -178,13 +191,13 @@ class EnergyWidget(QWidget):
             self.consumption_bar.setValue(magnitude)
             self.regen_bar.setValue(0)
             self.current_label.setStyleSheet(
-                "font-family: Arial, sans-serif; font-size: 20px; font-weight: 600; color: #FFAA00; border: none; background: transparent;"
+                "font-family: Arial, sans-serif; font-size: 18px; font-weight: 600; color: #FFAA00; border: none; background: transparent;"
             )
             self._set_power_bar_colors("#FFAA00", "#1A2C2C")
         else:
             self.consumption_bar.setValue(0)
             self.regen_bar.setValue(magnitude)
             self.current_label.setStyleSheet(
-                "font-family: Arial, sans-serif; font-size: 20px; font-weight: 600; color: #00FFFF; border: none; background: transparent;"
+                "font-family: Arial, sans-serif; font-size: 18px; font-weight: 600; color: #00FFFF; border: none; background: transparent;"
             )
             self._set_power_bar_colors("#2C1E10", "#00FFFF")
