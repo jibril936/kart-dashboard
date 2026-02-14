@@ -8,7 +8,9 @@ from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
-from src.ui.components import BottomBarStrip, CenterPanel, CircularGauge
+from src.ui.components.bottom_bar import BottomBarStrip
+from src.ui.components.center_panel import CenterPanel
+from src.ui.components.circular_gauge import CircularGauge
 from src.ui.components.speed_gauge_oem import SpeedGaugeOEM
 
 SPEED_MIN_KMH = 0
