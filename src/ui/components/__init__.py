@@ -1,4 +1,6 @@
+from src.ui.components.battery_widget import BatteryWidget
 from src.ui.components.bottom_bar import BottomBar, BottomBarStrip
+from src.ui.components.power_widget import PowerWidget
 from src.ui.components.center_panel import CenterPanel
 from src.ui.components.kart_top_view_widget import KartTopViewWidget
 from src.ui.components.circular_gauge import CircularGauge
@@ -10,6 +12,8 @@ __all__ = [
     "SpeedGaugeOEM",
     "CenterPanel",
     "KartTopViewWidget",
+    "BatteryWidget",
+    "PowerWidget",
     "BottomBar",
     "BottomBarStrip",
     "DriveTopIndicators",
