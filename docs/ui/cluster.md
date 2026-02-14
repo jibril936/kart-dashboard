@@ -1,11 +1,13 @@
-# CLUSTER screen: architecture et réglages speed gauge
+# CLUSTER screen: architecture, gauge et kart central
 
 ## Où se trouve chaque composant
 
 - **Écran CLUSTER (page 1)**: `src/ui/cluster_screen.py`
 - **Gauge legacy (ancien widget custom)**: `src/ui/components/circular_gauge.py`
 - **Gauge vendorisée (tierce partie)**: `src/ui/third_party/analoggaugewidget/analoggaugewidget.py`
+- **Licence gauge vendorisée**: `src/ui/third_party/analoggaugewidget/LICENSE`
 - **Wrapper projet (API stable pour CLUSTER)**: `src/ui/components/speed_gauge_oem.py`
+- **Widget kart top-view (roues avant animées)**: `src/ui/components/kart_top_view_widget.py`
 - **Thème global PyQt/QSS**: `src/ui/theme.py`
 - **Notices/licence tierce partie**:
   - `THIRD_PARTY_NOTICES.md`
@@ -81,6 +83,39 @@ Le wrapper expose:
 - `set_value(...)`
 - `set_speed(...)`
 - `set_range(...)`
+- `set_style(...)` (override ciblé des couleurs/ticks/angle/needle via le wrapper)
+
+## Kart top-view (centre) : quoi modifier
+
+Le rendu du kart est encapsulé dans `src/ui/components/kart_top_view_widget.py`.
+
+### 1) Angles et braquage
+- Clamp visuel: `STEER_VISUAL_CLAMP_DEG`
+- Effet type Ackermann: `ACKERMANN_FACTOR`
+
+### 2) Animation fluide des roues avant
+- Animation: `QPropertyAnimation` sur la propriété `steerAngleDeg`
+- Durées: `STEER_ANIM_MIN_MS` / `STEER_ANIM_MAX_MS`
+- Easing: `QEasingCurve.Type.OutCubic`
+
+### 3) Géométrie des roues
+Dans `_draw_kart(...)` et `_draw_wheel(...)`:
+- positions roues avant/arrière
+- pivot de rotation (variable `pivot_x`)
+- dimensions pneus (`QRectF(-8, -18, 16, 36)`)
+
+### 4) Couleurs et intégration thème
+Couleurs principales dans:
+- fond plaque + glow
+- carrosserie
+- pneus / accents
+
+Pour une harmonisation future, aligner les hex avec `src/ui/theme.py`.
+
+## Intégration CLUSTER (limité écran CLUSTER)
+
+- Le remplacement gauge se fait uniquement dans `src/ui/cluster_screen.py` via `SpeedGaugeOEM`.
+- Le kart central est injecté via `CenterPanel` (`src/ui/components/center_panel.py`) sans ajout de nouveaux widgets/informations.
 
 ## Mini guide “je modifie moi-même”
 
