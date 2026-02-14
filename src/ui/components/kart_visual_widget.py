@@ -10,7 +10,7 @@ class KartVisualWidget(QWidget):
         super().__init__(parent)
         self._steering_angle_deg = 0.0
         self.setMinimumWidth(220)
-        self.setStyleSheet("background: transparent;")
+        self.setStyleSheet("background-color: #1a2634; border-radius: 15px; border: 1px solid #2c3e50;")
 
     def set_steering_angle(self, angle_deg: float) -> None:
         self._steering_angle_deg = max(-45.0, min(45.0, float(angle_deg)))
@@ -21,11 +21,13 @@ class KartVisualWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        w = self.width()
-        h = self.height()
-        cx = w * 0.5
-        top_y = h * 0.16
-        bottom_y = h * 0.82
+        pad_x = 18
+        pad_y = 18
+        w = max(1, self.width() - (2 * pad_x))
+        h = max(1, self.height() - (2 * pad_y))
+        cx = pad_x + (w * 0.5)
+        top_y = pad_y + (h * 0.16)
+        bottom_y = pad_y + (h * 0.82)
 
         chassis_top_half = w * 0.16
         chassis_bottom_half = w * 0.30
@@ -47,7 +49,7 @@ class KartVisualWidget(QWidget):
 
         rear_w = w * 0.09
         rear_h = h * 0.2
-        rear_y = h * 0.58
+        rear_y = pad_y + (h * 0.58)
         rear_offset = w * 0.24
 
         painter.setPen(QPen(rear_wheel_color, 2))
@@ -57,7 +59,7 @@ class KartVisualWidget(QWidget):
 
         front_w = w * 0.08
         front_h = h * 0.18
-        front_center_y = h * 0.25
+        front_center_y = pad_y + (h * 0.25)
         front_offset = w * 0.2
 
         painter.setPen(QPen(front_wheel_color, 2))
