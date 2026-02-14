@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(0)
 
         self.stack = QStackedWidget(central_widget)
-        self.stack.addWidget(DrivingScreen())
+        self.stack.addWidget(DrivingScreen(self.model))
         self.stack.addWidget(TechScreen())
         self.stack.addWidget(GraphsScreen())
 
