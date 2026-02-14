@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QGridLayout, QLabel, QWidget
 from src.core.model import KartDataModel
 from src.ui.components.bottom_bar import BottomBar
 from src.ui.components.energy_widget import EnergyWidget
-from src.ui.components.kart_visual_widget import KartVisualWidget
+from src.ui.components.dynamics_widget import DynamicsWidget
 from src.ui.components.speed_gauge_oem import SpeedGaugeOEM
 
 
@@ -21,7 +21,7 @@ class DrivingScreen(QWidget):
         layout.setSpacing(14)
 
         self.energy_widget = EnergyWidget(self)
-        self.kart_visual_widget = KartVisualWidget(self)
+        self.dynamics_widget = DynamicsWidget(self)
         self.bottom_bar = BottomBar(self)
 
         self.speed_gauge = SpeedGaugeOEM(
@@ -35,7 +35,7 @@ class DrivingScreen(QWidget):
 
         layout.addWidget(self.energy_widget, 0, 0)
         layout.addWidget(self.speed_gauge, 0, 1)
-        layout.addWidget(self.kart_visual_widget, 0, 2)
+        layout.addWidget(self.dynamics_widget, 0, 2)
         layout.addWidget(self.bottom_bar, 1, 0, 1, 3)
 
         layout.setRowStretch(0, 4)
@@ -57,7 +57,19 @@ class DrivingScreen(QWidget):
         self.model.motor_temperature_changed.connect(self._on_motor_temp_changed)
         self.model.battery_temperature_changed.connect(self._on_battery_temp_changed)
         self.model.warnings_changed.connect(self.bottom_bar.update_warning)
-        self.model.steering_angle_changed.connect(self.kart_visual_widget.set_steering_angle)
+        self.model.steering_angle_changed.connect(self.dynamics_widget.set_steering_angle)
+
+        brake_signal = getattr(self.model, "brakeActive", None)
+        if brake_signal is None:
+            brake_signal = getattr(self.model, "brake_state_changed", None)
+        if brake_signal is not None:
+            brake_signal.connect(self.dynamics_widget.set_brake_state)
+
+        radar_signal = getattr(self.model, "ultrasonicDistances", None)
+        if radar_signal is None:
+            radar_signal = getattr(self.model, "ultrasonic_distances_changed", None)
+        if radar_signal is not None:
+            radar_signal.connect(self.dynamics_widget.update_radars)
 
         self._motor_temp = self.model.motor_temperature
         self._battery_temp = self.model.battery_temperature
@@ -66,6 +78,10 @@ class DrivingScreen(QWidget):
         self._refresh_energy_widgets()
         self.bottom_bar.update_temperatures(self._motor_temp, self._battery_temp)
         self.bottom_bar.update_warning(self.model.warnings)
+
+        self.dynamics_widget.set_steering_angle(self.model.steering_angle)
+        self.dynamics_widget.set_brake_state(bool(getattr(self.model, "brake_state", False)))
+        self.dynamics_widget.update_radars(list(getattr(self.model, "ultrasonic_distances", [400.0, 400.0, 400.0])))
 
     def _refresh_energy_widgets(self) -> None:
         self.energy_widget.update_values(self._voltage, self._current)
