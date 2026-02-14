@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QRectF, Qt, pyqtProperty
 from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 from PyQt6.QtWidgets import QWidget
 
 STEER_VISUAL_CLAMP_DEG = 30.0
-STEER_SMOOTH_ALPHA = 0.2
-STEER_REFRESH_MS = 40
 ACKERMANN_FACTOR = 0.12
+STEER_ANIM_MIN_MS = 90
+STEER_ANIM_MAX_MS = 220
 
 
 class KartTopViewWidget(QWidget):
@@ -18,10 +18,9 @@ class KartTopViewWidget(QWidget):
         self._compact = False
         self._ui_scale = 1.0
 
-        self._timer = QTimer(self)
-        self._timer.setInterval(STEER_REFRESH_MS)
-        self._timer.timeout.connect(self._tick_animation)
-        self._timer.start()
+        self._steer_anim = QPropertyAnimation(self, b"steerAngleDeg", self)
+        self._steer_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._steer_anim.setDuration(STEER_ANIM_MIN_MS)
 
         self.setMinimumHeight(170)
 
@@ -33,21 +32,33 @@ class KartTopViewWidget(QWidget):
     def set_steer_angle(self, deg: float | None) -> None:
         value = 0.0 if deg is None else float(deg)
         self._target_angle_deg = max(-STEER_VISUAL_CLAMP_DEG, min(STEER_VISUAL_CLAMP_DEG, value))
+        delta = abs(self._target_angle_deg - self._display_angle_deg)
+        if delta < 0.05:
+            self._set_steer_angle_internal(self._target_angle_deg)
+            return
+
+        duration = int(min(STEER_ANIM_MAX_MS, max(STEER_ANIM_MIN_MS, 6.0 * delta + 85.0)))
+        self._steer_anim.stop()
+        self._steer_anim.setDuration(duration)
+        self._steer_anim.setStartValue(self._display_angle_deg)
+        self._steer_anim.setEndValue(self._target_angle_deg)
+        self._steer_anim.start()
 
     @property
     def display_angle_deg(self) -> float:
         return self._display_angle_deg
 
-    def _tick_animation(self) -> None:
-        delta = self._target_angle_deg - self._display_angle_deg
-        if abs(delta) < 0.05:
-            if self._display_angle_deg != self._target_angle_deg:
-                self._display_angle_deg = self._target_angle_deg
-                self.update()
-            return
-
-        self._display_angle_deg += delta * STEER_SMOOTH_ALPHA
+    def _set_steer_angle_internal(self, value: float) -> None:
+        self._display_angle_deg = float(value)
         self.update()
+
+    @pyqtProperty(float)
+    def steerAngleDeg(self) -> float:  # noqa: N802
+        return self._display_angle_deg
+
+    @steerAngleDeg.setter
+    def steerAngleDeg(self, value: float) -> None:  # noqa: N802
+        self._set_steer_angle_internal(value)
 
     def paintEvent(self, event) -> None:  # noqa: N802
         _ = event

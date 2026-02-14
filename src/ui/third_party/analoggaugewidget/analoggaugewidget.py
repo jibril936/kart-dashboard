@@ -88,6 +88,34 @@ class AnalogGaugeWidget(QWidget):
     def setGaugeTheme(self, *_args, **_kwargs) -> None:  # noqa: N802
         self.update()
 
+    def setStyleProfile(self, **style: object) -> None:  # noqa: N802
+        """Apply lightweight style overrides from project wrapper.
+
+        Supported keys:
+        - `start_angle`, `span_angle`
+        - `major_ticks`, `minor_ticks`
+        - any color attribute (`*_color`), with QColor or hex string values
+        """
+
+        if "start_angle" in style:
+            self.scale_angle_start_value = float(style["start_angle"])
+        if "span_angle" in style:
+            self.scale_angle_size = float(style["span_angle"])
+        if "major_ticks" in style:
+            self.scala_main_count = max(1, int(style["major_ticks"]))
+        if "minor_ticks" in style:
+            self.scala_subdiv_count = max(0, int(style["minor_ticks"]))
+
+        for key, value in style.items():
+            if not key.endswith("_color") or not hasattr(self, key):
+                continue
+            if isinstance(value, QColor):
+                setattr(self, key, QColor(value))
+            elif isinstance(value, str):
+                setattr(self, key, QColor(value))
+
+        self.update()
+
     def setDisplayUnits(self, unit: str) -> None:  # noqa: N802
         self.display_units = unit
         self.update()

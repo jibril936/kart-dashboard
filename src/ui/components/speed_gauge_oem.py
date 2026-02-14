@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from PyQt6.QtWidgets import QWidget
 
 from src.ui.third_party.analoggaugewidget.analoggaugewidget import AnalogGaugeWidget
@@ -42,6 +44,20 @@ class SpeedGaugeOEM(QWidget):
     def set_range(self, min_value: float, max_value: float) -> None:
         self._gauge.setMinValue(min_value)
         self._gauge.setMaxValue(max_value)
+
+    def set_style(self, style: Mapping[str, object] | None = None, **kwargs: object) -> None:
+        """Apply style overrides to the vendor gauge.
+
+        Keys can be passed either via mapping or keyword args and are forwarded
+        to ``AnalogGaugeWidget.setStyleProfile``.
+        """
+
+        merged: dict[str, object] = {}
+        if style:
+            merged.update(style)
+        merged.update(kwargs)
+        if merged:
+            self._gauge.setStyleProfile(**merged)
 
     def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
         self._gauge.set_compact_mode(compact, ui_scale)
