@@ -39,6 +39,7 @@ class KartDataModel(QObject):
     ultrasonic_distances_changed = pyqtSignal(list)
     energy_wh_changed = pyqtSignal(float)
     battery_sag_changed = pyqtSignal(float)
+    mode_changed = pyqtSignal(str)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -76,6 +77,7 @@ class KartDataModel(QObject):
         self._ultrasonic_distances = [400.0, 400.0, 400.0]
         self._energy_wh = 0.0
         self._battery_sag = 0.0
+        self._mode = "SPORT"
 
         self._timer = QTimer(self)
         self._timer.setInterval(50)
@@ -206,6 +208,10 @@ class KartDataModel(QObject):
     def battery_sag(self) -> float:
         return self._battery_sag
 
+    @property
+    def mode(self) -> str:
+        return self._mode
+
     def update_simulation(self) -> None:
         now = time.monotonic()
         t = now - self._start_time
@@ -331,3 +337,14 @@ class KartDataModel(QObject):
         self.energy_wh_changed.emit(self._energy_wh)
         self._battery_sag = sag
         self.battery_sag_changed.emit(self._battery_sag)
+
+        if speed < 15.0:
+            mode = "ECO"
+        elif speed < 40.0:
+            mode = "SPORT"
+        else:
+            mode = "RACE"
+
+        if mode != self._mode:
+            self._mode = mode
+            self.mode_changed.emit(self._mode)
