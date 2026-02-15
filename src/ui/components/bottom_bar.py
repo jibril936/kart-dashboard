@@ -1,75 +1,101 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, pyqtProperty
+from PyQt6.QtGui import QColor, QLinearGradient, QPainter
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+
+class TemperatureStrip(QWidget):
+    def __init__(self, title: str, max_temp: float, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._title = title
+        self._max_temp = max_temp
+        self._target_temp = 0.0
+        self._display_temp = 0.0
+        self.setMinimumHeight(52)
+        self.setStyleSheet("background: transparent; border: none;")
+
+        self.label = QLabel(f"{title} --°C")
+        self.label.setStyleSheet("color: #dce7f7; font-size: 14px; font-weight: 600; border: none;")
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(6)
+        root.addWidget(self.label)
+
+        self._anim = QPropertyAnimation(self, b"displayTemp", self)
+        self._anim.setDuration(260)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+    def set_temp(self, value: float) -> None:
+        self._target_temp = max(0.0, min(self._max_temp, float(value)))
+        self._anim.stop()
+        self._anim.setStartValue(self._display_temp)
+        self._anim.setEndValue(self._target_temp)
+        self._anim.start()
+
+    @pyqtProperty(float)
+    def displayTemp(self) -> float:  # noqa: N802
+        return self._display_temp
+
+    @displayTemp.setter
+    def displayTemp(self, value: float) -> None:  # noqa: N802
+        self._display_temp = float(value)
+        self.label.setText(f"{self._title} {self._display_temp:.0f}°C")
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        _ = event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        bar = self.rect().adjusted(0, self.height() - 12, 0, -2)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#242424"))
+        painter.drawRoundedRect(bar, 4, 4)
+
+        ratio = max(0.0, min(1.0, self._display_temp / self._max_temp))
+        fill = bar.adjusted(0, 0, int(-(bar.width() * (1.0 - ratio))), 0)
+        grad = QLinearGradient(fill.topLeft(), fill.topRight())
+        grad.setColorAt(0.0, QColor("#19c463"))
+        grad.setColorAt(0.7, QColor("#c9b421"))
+        grad.setColorAt(1.0, QColor("#f13f3f"))
+        painter.setBrush(grad)
+        painter.drawRoundedRect(fill, 4, 4)
 
 
 class BottomBar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(
-            """
-            QWidget {
-                background-color: #121a22;
-                border-top: 2px solid #2c3e50;
-                border-radius: 0px;
-            }
-            QLabel {
-                color: #D8F7FF;
-                background: transparent;
-                border: none;
-                font-family: Arial, sans-serif;
-                font-size: 20px;
-                font-weight: 700;
-            }
-            """
-        )
+        self.setStyleSheet("background: #151515; border: none; border-radius: 12px;")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setSpacing(16)
 
-        self.motor_temp_label = QLabel("MOTEUR  --°C")
-        self.motor_temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.motor_temp_label.setStyleSheet(
-            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
-        )
+        self.motor_strip = TemperatureStrip("MOTEUR", 120.0)
+        self.battery_strip = TemperatureStrip("BATTERIE", 80.0)
 
-        self.battery_temp_label = QLabel("BATTERIE  --°C")
-        self.battery_temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.battery_temp_label.setStyleSheet(
-            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
-        )
         self.warning_label = QLabel("")
         self.warning_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
-        self.warning_label.setStyleSheet("font-size: 18px; font-weight: 800; color: #D8F7FF;")
+        self.warning_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #8c9aad; border: none;")
 
-        layout.addWidget(self.motor_temp_label, 1)
-        layout.addWidget(self.battery_temp_label, 1)
+        layout.addWidget(self.motor_strip, 1)
+        layout.addWidget(self.battery_strip, 1)
         layout.addWidget(self.warning_label, 2)
 
     def update_temperatures(self, motor_temp: float, battery_temp: float) -> None:
-        motor = float(motor_temp)
-        battery = float(battery_temp)
-
-        self.motor_temp_label.setText(f"MOTEUR  {motor:.0f}°C")
-        self.battery_temp_label.setText(f"BATTERIE  {battery:.0f}°C")
-
-        motor_color = "#FF3333" if motor > 90.0 else "#D8F7FF"
-        self.motor_temp_label.setStyleSheet(
-            f"font-size: 18px; font-weight: 700; color: {motor_color}; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
-        )
-        self.battery_temp_label.setStyleSheet(
-            "font-size: 18px; font-weight: 700; color: #D8F7FF; background-color: #1f2d3a; border: 1px solid #2c3e50; border-radius: 8px; padding: 6px 10px;"
-        )
+        self.motor_strip.set_temp(float(motor_temp))
+        self.battery_strip.set_temp(float(battery_temp))
 
     def update_warning(self, warnings: list[str]) -> None:
         if warnings:
             self.warning_label.setText(" | ".join(warnings).upper())
-            self.warning_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #FF3333;")
+            self.warning_label.setStyleSheet("font-size: 14px; font-weight: 800; color: #ff5252; border: none;")
         else:
             self.warning_label.setText("")
-            self.warning_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #D8F7FF;")
+            self.warning_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #8c9aad; border: none;")
 
     def set_values(self, battery_voltage: float | None, battery_soc_percent: float | None, motor_temp_c: float | None) -> None:
         _ = (battery_voltage, battery_soc_percent)
