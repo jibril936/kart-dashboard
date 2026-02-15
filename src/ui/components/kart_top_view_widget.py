@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel
@@ -8,9 +10,16 @@ from PyQt6.QtWidgets import QLabel
 class KartTopViewWidget(QLabel):
     def __init__(self, parent: QLabel | None = None) -> None:
         super().__init__(parent)
-        self.pixmap = QPixmap("./assets/kart_top.png")
+        asset_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "kart_top.png")
+        )
+        self.pixmap = QPixmap(asset_path)
         if self.pixmap.isNull():
-            print("ERREUR CRITIQUE: Image du kart non trouvée dans assets/")
+            print("\033[91m" + "=" * 80)
+            print("ERREUR CRITIQUE: IMPOSSIBLE DE CHARGER L'IMAGE KART")
+            print(f"CHEMIN TESTÉ: {asset_path}")
+            print("VÉRIFIE LE FICHIER src/assets/kart_top.png")
+            print("=" * 80 + "\033[0m")
 
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setScaledContents(False)
@@ -28,8 +37,12 @@ class KartTopViewWidget(QLabel):
             self.clear()
             return
 
+        target_height = max(1, int(self.height() * 0.8))
+        target_width = max(1, self.width())
+
         scaled = self.pixmap.scaled(
-            self.size(),
+            target_width,
+            target_height,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
