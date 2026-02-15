@@ -192,10 +192,16 @@ class DrivingScreen(QWidget):
         temp_layout.addWidget(self.motor_temp_bar, 1)
         temp_layout.addWidget(self.battery_temp_bar, 1)
 
+        right_column = QWidget(self)
+        right_layout = QVBoxLayout(right_column)
+        right_layout.setContentsMargins(6, 6, 6, 6)
+        right_layout.setSpacing(0)
+        right_layout.addWidget(self.power_gauge)
+
         layout.addWidget(self.warning_strip, 0, 0, 1, 3)
         layout.addWidget(left_column, 1, 0)
         layout.addWidget(self.kart_visual, 1, 1)
-        layout.addWidget(self.power_gauge, 1, 2)
+        layout.addWidget(right_column, 1, 2)
         layout.addWidget(temp_row, 2, 0, 1, 3)
 
         layout.setRowStretch(0, 0)
