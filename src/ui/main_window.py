@@ -10,13 +10,15 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.model import KartDataModel
-from src.ui.screens import DrivingScreen, GraphsScreen, TechScreen
+from src.core.state import VehicleTechState
+from src.ui.cluster_screen import ClusterScreen
+from src.ui.screens import GraphsScreen, TechScreen
 
 
 class MainWindow(QMainWindow):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Kart Dashboard")
+        self.setWindowTitle("KART DASHBOARD PRO V2 - ACTIVE")
         self.resize(1024, 600)
 
         self.model = KartDataModel(self)
@@ -27,7 +29,9 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(0)
 
         self.stack = QStackedWidget(central_widget)
-        self.stack.addWidget(DrivingScreen(self.model))
+        self.cluster_screen = ClusterScreen()
+        self.cluster_screen.tech_requested.connect(lambda: self.stack.setCurrentIndex(1))
+        self.stack.addWidget(self.cluster_screen)
         self.stack.addWidget(TechScreen())
         self.stack.addWidget(GraphsScreen())
 
@@ -52,3 +56,17 @@ class MainWindow(QMainWindow):
         self.btn_driving.clicked.connect(lambda: self.stack.setCurrentIndex(0))
         self.btn_tech.clicked.connect(lambda: self.stack.setCurrentIndex(1))
         self.btn_graphs.clicked.connect(lambda: self.stack.setCurrentIndex(2))
+
+        self.model.speed_changed.connect(lambda _value: self._render_cluster())
+        self._render_cluster()
+
+    def _render_cluster(self) -> None:
+        state = VehicleTechState(
+            speed_kmh=self.model.speed,
+            steering_angle_deg=self.model.steering_angle,
+            charging_state=self.model.charging_state,
+            battery_voltage_V=self.model.battery_pack_voltage,
+            battery_charge_current_A=self.model.battery_pack_current,
+            motor_temp_C=self.model.motor_temperature,
+        )
+        self.cluster_screen.render(state)

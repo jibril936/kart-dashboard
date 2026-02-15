@@ -14,7 +14,7 @@ POWER_MIN_KW = -12.0
 POWER_MAX_KW = 12.0
 
 
-class SegmentedGaugeWidget(QWidget):
+class SegmentedGauge(QWidget):
     def __init__(
         self,
         title: str,
@@ -134,6 +134,7 @@ class ClusterScreen(QWidget):
         self._base_ui_scale = ui_scale
 
         self.setObjectName("ClusterScreen")
+        self.setWindowTitle("KART DASHBOARD PRO V2 - ACTIVE")
         self.setStyleSheet(
             "#ClusterScreen { background-color: #050505; border: none; }"
             " QWidget { border: none; background: transparent; }"
@@ -143,9 +144,9 @@ class ClusterScreen(QWidget):
         grid.setContentsMargins(42, 28, 42, 24)
         grid.setSpacing(30)
 
-        self.speed_gauge = SegmentedGaugeWidget("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH, segments=38, value_font_size=72)
+        self.speed_gauge = SegmentedGauge("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH, segments=38, value_font_size=72)
         self.center_panel = CenterPanel()
-        self.power_gauge = SegmentedGaugeWidget("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=34, value_font_size=64)
+        self.power_gauge = SegmentedGauge("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=34, value_font_size=64)
 
         self.bottom_bar = BottomBarStrip()
         self.bottom_bar.tech_button.clicked.connect(self.tech_requested.emit)

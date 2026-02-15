@@ -10,9 +10,9 @@ from PyQt6.QtWidgets import QLabel
 class KartTopViewWidget(QLabel):
     def __init__(self, parent: QLabel | None = None) -> None:
         super().__init__(parent)
-        asset_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "kart_top.png")
-        )
+        image_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "kart_top.png")
+        print(f"DEBUG PATH: {os.path.abspath(image_path)}")
+        asset_path = os.path.abspath(image_path)
         self.pixmap = QPixmap(asset_path)
         if self.pixmap.isNull():
             print("\033[91m" + "=" * 80)

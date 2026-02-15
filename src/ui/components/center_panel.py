@@ -12,7 +12,7 @@ class CenterPanel(QWidget):
         super().__init__(parent)
         self._compact = False
 
-        self.setStyleSheet("background: transparent; border: none;")
+        self.setStyleSheet("background-color: red; border: none;")
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
