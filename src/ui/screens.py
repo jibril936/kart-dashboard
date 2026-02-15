@@ -132,7 +132,14 @@ class BidirectionalBar(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(color)
-        painter.drawRoundedRect(fill_left, fill_top, fill_width, fill_bottom - fill_top, 4, 4)
+        painter.drawRoundedRect(
+            int(fill_left),
+            int(fill_top),
+            int(fill_width),
+            int(fill_bottom - fill_top),
+            4,
+            4,
+        )
 
 
 class TemperatureBar(QFrame):
