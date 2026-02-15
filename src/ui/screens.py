@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -14,6 +13,7 @@ from PyQt6.QtWidgets import (
 
 from src.core.model import KartDataModel
 from src.ui.components.kart_visual_widget import KartVisualWidget
+from src.ui.components.leaf_power_gauge import LeafPowerGauge
 from src.ui.components.speed_gauge_oem import SpeedGaugeOEM
 
 
@@ -44,101 +44,6 @@ class WarningStrip(QFrame):
                 border-radius: 10px;
             }
             """
-        )
-
-
-class CurrentWidget(QFrame):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._max_abs_current = 200.0
-        self._current = 0.0
-        self.setMinimumWidth(170)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-
-        title = QLabel("CURRENT")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #9fb7ca; font-size: 13px; font-weight: 700;")
-
-        self.value_label = QLabel("+0 A")
-        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.value_label.setStyleSheet("color: #dff8ff; font-size: 28px; font-weight: 800;")
-
-        self.bar = BidirectionalBar(self._max_abs_current)
-        self.bar.setMinimumHeight(180)
-
-        layout.addWidget(title)
-        layout.addWidget(self.value_label)
-        layout.addWidget(self.bar, 1, Qt.AlignmentFlag.AlignHCenter)
-
-        self.setStyleSheet(
-            """
-            QFrame {
-                background-color: #0d141d;
-                border: 1px solid #1f3344;
-                border-radius: 12px;
-            }
-            """
-        )
-
-    def set_current(self, current: float) -> None:
-        self._current = max(-self._max_abs_current, min(self._max_abs_current, float(current)))
-        self.value_label.setText(f"{self._current:+.0f} A")
-        self.bar.set_value(self._current)
-
-
-class BidirectionalBar(QWidget):
-    def __init__(self, max_abs: float = 200.0, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._max_abs = max(1.0, float(max_abs))
-        self._value = 0.0
-        self.setMinimumWidth(44)
-
-    def set_value(self, value: float) -> None:
-        self._value = max(-self._max_abs, min(self._max_abs, float(value)))
-        self.update()
-
-    def paintEvent(self, event) -> None:  # noqa: N802
-        _ = event
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        rect = self.rect().adjusted(6, 6, -6, -6)
-        painter.setPen(QColor("#2d465c"))
-        painter.setBrush(QColor("#071018"))
-        painter.drawRoundedRect(rect, 6, 6)
-
-        center_y = rect.center().y()
-        painter.setPen(QColor("#8cc5df"))
-        painter.drawLine(rect.left() + 3, int(center_y), rect.right() - 3, int(center_y))
-
-        ratio = abs(self._value) / self._max_abs
-        fill_h = (rect.height() * 0.5) * ratio
-        if fill_h <= 0.0:
-            return
-
-        fill_left = rect.left() + 4
-        fill_width = rect.width() - 8
-        if self._value >= 0.0:
-            fill_top = center_y - fill_h
-            fill_bottom = center_y
-            color = QColor("#58c6f8")
-        else:
-            fill_top = center_y
-            fill_bottom = center_y + fill_h
-            color = QColor("#2f8fd8")
-
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(color)
-        painter.drawRoundedRect(
-            int(fill_left),
-            int(fill_top),
-            int(fill_width),
-            int(fill_bottom - fill_top),
-            4,
-            4,
         )
 
 
@@ -258,7 +163,7 @@ class DrivingScreen(QWidget):
         layout.setVerticalSpacing(10)
 
         self.warning_strip = WarningStrip(self)
-        self.current_widget = CurrentWidget(self)
+        self.power_gauge = LeafPowerGauge(self)
         self.kart_visual = KartVisualWidget(self)
         self.battery_card = BatteryCard(self)
         self.motor_temp_bar = TemperatureBar("MOTOR TEMP", "°C", 0.0, 120.0, self)
@@ -290,7 +195,7 @@ class DrivingScreen(QWidget):
         layout.addWidget(self.warning_strip, 0, 0, 1, 3)
         layout.addWidget(left_column, 1, 0)
         layout.addWidget(self.kart_visual, 1, 1)
-        layout.addWidget(self.current_widget, 1, 2)
+        layout.addWidget(self.power_gauge, 1, 2)
         layout.addWidget(temp_row, 2, 0, 1, 3)
 
         layout.setRowStretch(0, 0)
@@ -326,16 +231,16 @@ class DrivingScreen(QWidget):
 
     def _refresh_energy_widgets(self) -> None:
         self.battery_card.set_values(self._voltage, self._soc)
-        self.current_widget.set_current(self._current)
+        self.power_gauge.set_values(self._voltage, self._current)
         self.motor_temp_bar.set_value(self._motor_temp)
         self.battery_temp_bar.set_value(self._battery_temp)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         compact = self.width() <= 900
-        self.layout().setColumnStretch(0, 115)
-        self.layout().setColumnStretch(1, 170 if not compact else 155)
-        self.layout().setColumnStretch(2, 115)
+        self.layout().setColumnStretch(0, 120)
+        self.layout().setColumnStretch(1, 170 if not compact else 150)
+        self.layout().setColumnStretch(2, 120)
 
         max_center_width = int(self.width() * (0.44 if compact else 0.48))
         self.kart_visual.setMaximumWidth(max(260, max_center_width))
