@@ -60,19 +60,23 @@ class NavButton(QPushButton):
         super().__init__(text, parent)
         self._active = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(30)
+        self.setMinimumHeight(54)
+        self.setMinimumWidth(170)
         self.setStyleSheet(
             """
             QPushButton {
-                background: transparent;
-                border: none;
-                color: #626E79;
-                font-size: 15px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131E26, stop:1 #101820);
+                border: 1px solid #2B3B49;
+                border-radius: 12px;
+                color: #89A4B8;
+                font-size: 18px;
                 font-weight: 700;
-                padding: 4px 0 8px 0;
+                letter-spacing: 1px;
+                padding: 6px 18px;
             }
             QPushButton:hover {
-                color: #b8d8f0;
+                color: #d8f1ff;
+                border: 1px solid #3D566B;
             }
             """
         )
@@ -82,16 +86,23 @@ class NavButton(QPushButton):
         self.setStyleSheet(
             """
             QPushButton {
-                background: transparent;
-                border: none;
-                border-bottom: %s;
+                background: %s;
+                border: %s;
+                border-radius: 12px;
                 color: %s;
-                font-size: 15px;
+                font-size: 18px;
                 font-weight: 700;
-                padding: 4px 0 8px 0;
+                letter-spacing: 1px;
+                padding: 6px 18px;
             }
             """
-            % ("3px solid #00FFFF" if active else "3px solid transparent", "#FFFFFF" if active else "#626E79")
+            % (
+                "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #152938, stop:1 #12202C)"
+                if active
+                else "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131E26, stop:1 #101820)",
+                "2px solid #5CDFFF" if active else "1px solid #2B3B49",
+                "#EAFDFF" if active else "#89A4B8",
+            )
         )
 
 
@@ -113,17 +124,19 @@ class BottomBar(QWidget):
         temp_row.addWidget(self.motor_strip, 1)
 
         nav_row = QHBoxLayout()
-        nav_row.setContentsMargins(100, 0, 100, 0)
-        nav_row.setSpacing(26)
+        nav_row.setContentsMargins(56, 2, 56, 0)
+        nav_row.setSpacing(22)
 
         self.cluster_button = NavButton("CLUSTER")
         self.tech_button = NavButton("TECH")
         self.graphs_button = NavButton("GRAPHS")
         self.cluster_button.set_active(True)
 
+        nav_row.addStretch(1)
         nav_row.addWidget(self.cluster_button)
         nav_row.addWidget(self.tech_button)
         nav_row.addWidget(self.graphs_button)
+        nav_row.addStretch(1)
 
         root.addLayout(temp_row)
         root.addLayout(nav_row)
