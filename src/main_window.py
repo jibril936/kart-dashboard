@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QMainWindow, QStackedWidget
+
+from src.ui.screens.cluster_page import ClusterPage
 
 
 class MainWindow(QMainWindow):
@@ -20,23 +21,9 @@ class MainWindow(QMainWindow):
         self._load_stylesheet()
 
     def _create_pages(self) -> None:
-        pages = [
-            self._build_page("Page 1 - Driving"),
-            self._build_page("Page 2 - BMS"),
-            self._build_page("Page 3 - Safety"),
-        ]
-        for page in pages:
-            self.stack.addWidget(page)
-
-    def _build_page(self, title: str) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        label = QLabel(title)
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        layout.addWidget(label)
-        return page
+        cluster_page = ClusterPage(self)
+        self.stack.addWidget(cluster_page)
+        self.stack.setCurrentWidget(cluster_page)
 
     def _apply_default_theme(self) -> None:
         self.setStyleSheet("background-color: #000000; color: #FFFFFF;")

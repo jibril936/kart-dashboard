@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 from abc import ABC, abstractmethod
 
 from PyQt6.QtCore import QThread
@@ -7,7 +8,11 @@ from PyQt6.QtCore import QThread
 from .state_store import StateStore
 
 
-class BaseDataService(QThread, ABC):
+class QABCMeta(type(QThread), abc.ABCMeta):
+    """Meta-class bridging PyQt's QObject meta-type and ABCMeta."""
+
+
+class BaseDataService(QThread, ABC, metaclass=QABCMeta):
     """Threaded service base that publishes data to the shared StateStore."""
 
     def __init__(self, state_store: StateStore, parent=None) -> None:
