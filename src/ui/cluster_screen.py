@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, pyqtProperty, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter
+from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
@@ -56,9 +56,9 @@ class SegmentedGaugeWidget(QWidget):
         root.addWidget(self.unit_label)
 
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(42)
+        glow.setBlurRadius(28)
         glow.setOffset(0, 0)
-        glow.setColor(QColor("#00E5FF"))
+        glow.setColor(QColor("#00FFFF"))
         self.setGraphicsEffect(glow)
 
         self._anim = QPropertyAnimation(self, b"displayValue", self)
@@ -113,16 +113,12 @@ class SegmentedGaugeWidget(QWidget):
             painter.translate(radius, 0)
 
             if index < active_segments:
-                active_ratio = index / max(1, self._segments - 1)
-                grad = QLinearGradient(-5, 0, 5, 0)
-                grad.setColorAt(0.0, QColor("#4EFFFF"))
-                grad.setColorAt(1.0, QColor.fromRgbF(0.0, 0.65 + 0.35 * active_ratio, 1.0, 1.0))
-                painter.setBrush(grad)
+                painter.setBrush(QColor("#00FFFF"))
             else:
                 painter.setBrush(QColor("#1B232A"))
 
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(-5, -14, 10, 24, 3, 3)
+            painter.drawRect(-2, -14, 4, 24)
             painter.restore()
 
         painter.setPen(QColor("#FFFFFF"))
@@ -138,7 +134,10 @@ class ClusterScreen(QWidget):
         self._base_ui_scale = ui_scale
 
         self.setObjectName("ClusterScreen")
-        self.setStyleSheet("#ClusterScreen { background: #000000; border: none; } QWidget { border: none; background: transparent; }")
+        self.setStyleSheet(
+            "#ClusterScreen { background-color: #050505; border: none; }"
+            " QWidget { border: none; background: transparent; }"
+        )
 
         grid = QGridLayout(self)
         grid.setContentsMargins(42, 28, 42, 24)
