@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 
 class KartVisualWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._steering_angle_deg = 0.0
-        self.setMinimumWidth(220)
+        self.setMinimumSize(170, 210)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContentsMargins(15, 15, 15, 15)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
@@ -26,6 +27,9 @@ class KartVisualWidget(QWidget):
             """
         )
 
+    def minimumSizeHint(self):  # noqa: N802
+        return self.minimumSize()
+
     def set_steering_angle(self, angle_deg: float) -> None:
         self._steering_angle_deg = max(-45.0, min(45.0, float(angle_deg)))
         self.update()
@@ -35,8 +39,8 @@ class KartVisualWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        pad_x = 18
-        pad_y = 18
+        pad_x = max(8, int(self.width() * 0.05))
+        pad_y = max(8, int(self.height() * 0.05))
         w = max(1, self.width() - (2 * pad_x))
         h = max(1, self.height() - (2 * pad_y))
         cx = pad_x + (w * 0.5)
