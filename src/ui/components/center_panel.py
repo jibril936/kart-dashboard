@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QLineF, QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from src.ui.components.kart_top_view_widget import KartTopViewWidget
@@ -19,17 +19,18 @@ class CenterPanel(QWidget):
         self._ui_scale = 1.0
 
         self.setMinimumSize(420, 280)
+        self.setStyleSheet("background: transparent; border: none;")
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 12, 14, 10)
-        root.setSpacing(8)
+        root.setContentsMargins(18, 16, 18, 12)
+        root.setSpacing(10)
 
         self.kart_widget = KartTopViewWidget()
 
-        self.angle_label = QLabel("+0.0°")
+        self.angle_label = QLabel("∡ +0.0°")
         self.angle_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.angle_label.setStyleSheet("color: #a8f3ff; letter-spacing: 1px;")
-        self.angle_label.setFont(QFont("Bahnschrift", 15, QFont.Weight.DemiBold))
+        self.angle_label.setStyleSheet("color: #dfeaff; letter-spacing: 1px; border: none;")
+        self.angle_label.setFont(QFont("Bahnschrift", 16, QFont.Weight.DemiBold))
 
         root.addWidget(self.kart_widget, 1)
         root.addWidget(self.angle_label)
@@ -37,7 +38,7 @@ class CenterPanel(QWidget):
     def set_compact_mode(self, compact: bool, ui_scale: float = 1.0) -> None:
         self._compact = compact
         self._ui_scale = ui_scale
-        self.angle_label.setFont(QFont("Bahnschrift", max(11, int((13 if compact else 15) * ui_scale)), QFont.Weight.DemiBold))
+        self.angle_label.setFont(QFont("Bahnschrift", max(11, int((13 if compact else 16) * ui_scale)), QFont.Weight.DemiBold))
 
     def set_state(
         self,
@@ -69,19 +70,6 @@ class CenterPanel(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = QRectF(self.rect()).adjusted(8.0, 8.0, -8.0, -8.0)
-        painter.setPen(QPen(QColor("#273547"), 1.0))
-
-        panel_grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        panel_grad.setColorAt(0.0, QColor("#111c2c"))
-        panel_grad.setColorAt(0.55, QColor("#0a131f"))
-        panel_grad.setColorAt(1.0, QColor("#04080e"))
-        painter.setBrush(panel_grad)
-        painter.drawRoundedRect(rect, 20, 20)
-
-        painter.setPen(QPen(QColor("#41596e"), 2.0))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 16, 16)
-
-        painter.setPen(QPen(QColor(84, 233, 255, 90), 1.4))
-        painter.drawLine(QLineF(rect.left() + 14.0, rect.top() + 12.0, rect.right() - 18.0, rect.top() + 12.0))
-        painter.drawLine(QLineF(rect.left() + 18.0, rect.bottom() - 12.0, rect.right() - 14.0, rect.bottom() - 12.0))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#151515"))
+        painter.drawRoundedRect(rect, 12, 12)
