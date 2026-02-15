@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -65,10 +66,7 @@ class CurrentWidget(QFrame):
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.value_label.setStyleSheet("color: #dff8ff; font-size: 28px; font-weight: 800;")
 
-        self.bar = QProgressBar()
-        self.bar.setOrientation(Qt.Orientation.Vertical)
-        self.bar.setRange(0, int(self._max_abs_current))
-        self.bar.setTextVisible(False)
+        self.bar = BidirectionalBar(self._max_abs_current)
         self.bar.setMinimumHeight(180)
 
         layout.addWidget(title)
@@ -82,23 +80,59 @@ class CurrentWidget(QFrame):
                 border: 1px solid #1f3344;
                 border-radius: 12px;
             }
-            QProgressBar {
-                border: 1px solid #2d465c;
-                border-radius: 6px;
-                background-color: #071018;
-                width: 34px;
-            }
-            QProgressBar::chunk {
-                background-color: #4bbef9;
-                border-radius: 5px;
-            }
             """
         )
 
     def set_current(self, current: float) -> None:
-        self._current = float(current)
+        self._current = max(-self._max_abs_current, min(self._max_abs_current, float(current)))
         self.value_label.setText(f"{self._current:+.0f} A")
-        self.bar.setValue(min(int(self._max_abs_current), int(abs(self._current))))
+        self.bar.set_value(self._current)
+
+
+class BidirectionalBar(QWidget):
+    def __init__(self, max_abs: float = 200.0, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._max_abs = max(1.0, float(max_abs))
+        self._value = 0.0
+        self.setMinimumWidth(44)
+
+    def set_value(self, value: float) -> None:
+        self._value = max(-self._max_abs, min(self._max_abs, float(value)))
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        _ = event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(6, 6, -6, -6)
+        painter.setPen(QColor("#2d465c"))
+        painter.setBrush(QColor("#071018"))
+        painter.drawRoundedRect(rect, 6, 6)
+
+        center_y = rect.center().y()
+        painter.setPen(QColor("#8cc5df"))
+        painter.drawLine(rect.left() + 3, int(center_y), rect.right() - 3, int(center_y))
+
+        ratio = abs(self._value) / self._max_abs
+        fill_h = (rect.height() * 0.5) * ratio
+        if fill_h <= 0.0:
+            return
+
+        fill_left = rect.left() + 4
+        fill_width = rect.width() - 8
+        if self._value >= 0.0:
+            fill_top = center_y - fill_h
+            fill_bottom = center_y
+            color = QColor("#58c6f8")
+        else:
+            fill_top = center_y
+            fill_bottom = center_y + fill_h
+            color = QColor("#2f8fd8")
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        painter.drawRoundedRect(fill_left, fill_top, fill_width, fill_bottom - fill_top, 4, 4)
 
 
 class TemperatureBar(QFrame):
@@ -167,9 +201,15 @@ class BatteryCard(QFrame):
         self.voltage = QLabel("--.- V")
         self.voltage.setStyleSheet("color: #9ed1ef; font-size: 15px; font-weight: 700;")
 
+        self.soc_bar = QProgressBar()
+        self.soc_bar.setRange(0, 100)
+        self.soc_bar.setTextVisible(False)
+        self.soc_bar.setMinimumHeight(12)
+
         layout.addWidget(title)
         layout.addWidget(self.percent)
         layout.addWidget(self.voltage)
+        layout.addWidget(self.soc_bar)
 
         self.setStyleSheet(
             """
@@ -178,14 +218,25 @@ class BatteryCard(QFrame):
                 border: 1px solid #203646;
                 border-radius: 10px;
             }
+            QProgressBar {
+                border: 1px solid #2a4153;
+                border-radius: 6px;
+                background-color: #08121a;
+            }
+            QProgressBar::chunk {
+                background-color: #5bb8ed;
+                border-radius: 5px;
+            }
             """
         )
 
-    def set_values(self, voltage: float) -> None:
+    def set_values(self, voltage: float, soc_percent: float | None = None) -> None:
         v = float(voltage)
-        soc = int(max(0.0, min(100.0, (v - 44.0) / (54.0 - 44.0) * 100.0)))
+        soc_value = soc_percent if soc_percent is not None else (v - 44.0) / (54.0 - 44.0) * 100.0
+        soc = int(max(0.0, min(100.0, soc_value)))
         self.percent.setText(f"{soc}%")
         self.voltage.setText(f"{v:.1f} V")
+        self.soc_bar.setValue(soc)
 
 
 class DrivingScreen(QWidget):
@@ -238,14 +289,15 @@ class DrivingScreen(QWidget):
         layout.setRowStretch(0, 0)
         layout.setRowStretch(1, 1)
         layout.setRowStretch(2, 0)
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 2)
-        layout.setColumnStretch(2, 1)
+        layout.setColumnStretch(0, 115)
+        layout.setColumnStretch(1, 170)
+        layout.setColumnStretch(2, 115)
 
         self._voltage = self.model.battery_pack_voltage
         self._current = self.model.battery_pack_current
         self._motor_temp = self.model.motor_temperature
         self._battery_temp = self.model.battery_temperature
+        self._soc = self.model.soc
 
         speed_signal = getattr(self.model, "speedChanged", None)
         if speed_signal is None:
@@ -256,6 +308,7 @@ class DrivingScreen(QWidget):
         self.model.battery_pack_current_changed.connect(self._on_current_changed)
         self.model.motor_temperature_changed.connect(self._on_motor_temp_changed)
         self.model.battery_temperature_changed.connect(self._on_battery_temp_changed)
+        self.model.soc_changed.connect(self._on_soc_changed)
         self.model.steering_angle_changed.connect(self.kart_visual.set_steering_angle)
         self.model.warnings_changed.connect(self._on_warnings_changed)
 
@@ -265,10 +318,20 @@ class DrivingScreen(QWidget):
         self._on_warnings_changed(self.model.warnings)
 
     def _refresh_energy_widgets(self) -> None:
-        self.battery_card.set_values(self._voltage)
+        self.battery_card.set_values(self._voltage, self._soc)
         self.current_widget.set_current(self._current)
         self.motor_temp_bar.set_value(self._motor_temp)
         self.battery_temp_bar.set_value(self._battery_temp)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        compact = self.width() <= 900
+        self.layout().setColumnStretch(0, 115)
+        self.layout().setColumnStretch(1, 170 if not compact else 155)
+        self.layout().setColumnStretch(2, 115)
+
+        max_center_width = int(self.width() * (0.44 if compact else 0.48))
+        self.kart_visual.setMaximumWidth(max(260, max_center_width))
 
     def _on_voltage_changed(self, voltage: float) -> None:
         self._voltage = float(voltage)
@@ -277,6 +340,10 @@ class DrivingScreen(QWidget):
     def _on_current_changed(self, current: float) -> None:
         self._current = float(current)
         self._refresh_energy_widgets()
+
+    def _on_soc_changed(self, value: float) -> None:
+        self._soc = float(value)
+        self.battery_card.set_values(self._voltage, self._soc)
 
     def _on_motor_temp_changed(self, value: float) -> None:
         self._motor_temp = float(value)
