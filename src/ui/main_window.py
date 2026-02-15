@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QMainWindow,
-    QPushButton,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from src.core.model import KartDataModel
 from src.core.state import VehicleTechState
 from src.ui.cluster_screen import ClusterScreen
+from src.ui.components.bottom_bar import NavButton
 from src.ui.screens import GraphsScreen, TechScreen
 
 
@@ -30,35 +24,42 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget(central_widget)
         self.cluster_screen = ClusterScreen()
-        self.cluster_screen.tech_requested.connect(lambda: self.stack.setCurrentIndex(1))
+        self.cluster_screen.tech_requested.connect(lambda: self._set_page(1))
         self.stack.addWidget(self.cluster_screen)
         self.stack.addWidget(TechScreen())
         self.stack.addWidget(GraphsScreen())
 
         nav_widget = QWidget(central_widget)
-        nav_widget.setStyleSheet("background-color: #191919;")
+        nav_widget.setStyleSheet("background: #0A0A0A; border-top: 1px solid #1C1C1C;")
         nav_layout = QHBoxLayout(nav_widget)
-        nav_layout.setContentsMargins(12, 10, 12, 10)
-        nav_layout.setSpacing(12)
+        nav_layout.setContentsMargins(320, 8, 320, 6)
+        nav_layout.setSpacing(26)
 
-        self.btn_driving = QPushButton("CLUSTER")
-        self.btn_tech = QPushButton("TECH")
-        self.btn_graphs = QPushButton("GRAPHS")
+        self.btn_driving = NavButton("CLUSTER")
+        self.btn_tech = NavButton("TECH")
+        self.btn_graphs = NavButton("GRAPHS")
 
         for button in (self.btn_driving, self.btn_tech, self.btn_graphs):
-            button.setMinimumHeight(56)
+            button.setMinimumHeight(26)
             nav_layout.addWidget(button)
 
         root_layout.addWidget(self.stack, 1)
         root_layout.addWidget(nav_widget, 0)
         self.setCentralWidget(central_widget)
 
-        self.btn_driving.clicked.connect(lambda: self.stack.setCurrentIndex(0))
-        self.btn_tech.clicked.connect(lambda: self.stack.setCurrentIndex(1))
-        self.btn_graphs.clicked.connect(lambda: self.stack.setCurrentIndex(2))
+        self.btn_driving.clicked.connect(lambda: self._set_page(0))
+        self.btn_tech.clicked.connect(lambda: self._set_page(1))
+        self.btn_graphs.clicked.connect(lambda: self._set_page(2))
+        self._set_page(0)
 
         self.model.speed_changed.connect(lambda _value: self._render_cluster())
         self._render_cluster()
+
+    def _set_page(self, index: int) -> None:
+        self.stack.setCurrentIndex(index)
+        self.btn_driving.set_active(index == 0)
+        self.btn_tech.set_active(index == 1)
+        self.btn_graphs.set_active(index == 2)
 
     def _render_cluster(self) -> None:
         state = VehicleTechState(

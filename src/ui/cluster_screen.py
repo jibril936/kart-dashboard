@@ -21,14 +21,14 @@ class SegmentedGauge(QWidget):
         unit: str,
         minimum: float,
         maximum: float,
-        segments: int = 36,
+        segments: int = 40,
         value_font_size: int = 66,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._min = float(minimum)
         self._max = float(maximum)
-        self._segments = max(30, min(40, int(segments)))
+        self._segments = 40 if int(segments) != 40 else int(segments)
         self._value = self._min
         self._display_value = self._min
         self._unit = unit
@@ -48,15 +48,15 @@ class SegmentedGauge(QWidget):
 
         self.unit_label = QLabel(unit)
         self.unit_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.unit_label.setFont(QFont("Inter", 14, QFont.Weight.Medium))
-        self.unit_label.setStyleSheet("color: #7B8791; background: transparent; border: none;")
+        self.unit_label.setFont(QFont("Roboto Mono", 12, QFont.Weight.Medium))
+        self.unit_label.setStyleSheet("color: #888888; background: transparent; border: none;")
 
         root.addWidget(self.title_label)
         root.addStretch(1)
         root.addWidget(self.unit_label)
 
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(28)
+        glow.setBlurRadius(26)
         glow.setOffset(0, 0)
         glow.setColor(QColor("#00FFFF"))
         self.setGraphicsEffect(glow)
@@ -100,8 +100,8 @@ class SegmentedGauge(QWidget):
         ratio = 0.0 if self._max == self._min else (self._display_value - self._min) / (self._max - self._min)
         active_segments = int(max(0.0, min(1.0, ratio)) * self._segments)
 
-        start_angle = -220.0
-        sweep = 260.0
+        start_angle = -215.0
+        sweep = 250.0
         angle_step = sweep / max(1, self._segments - 1)
 
         for index in range(self._segments):
@@ -114,16 +114,41 @@ class SegmentedGauge(QWidget):
 
             if index < active_segments:
                 painter.setBrush(QColor("#00FFFF"))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRect(-4, -16, 8, 28)
+                painter.setBrush(QColor("#00FFFF"))
             else:
-                painter.setBrush(QColor("#1B232A"))
+                painter.setBrush(QColor("#252525"))
 
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(-2, -14, 4, 24)
             painter.restore()
 
         painter.setPen(QColor("#FFFFFF"))
-        painter.setFont(QFont("Inter", self._value_font_size, QFont.Weight.Bold))
+        painter.setFont(QFont("Roboto Mono", self._value_font_size, QFont.Weight.Bold))
         painter.drawText(self.rect().adjusted(0, -18, 0, 0), Qt.AlignmentFlag.AlignCenter, self._formatted_value())
+
+
+class CockpitPanel(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(
+            """
+            QWidget {
+                background-color: #151515;
+                border: 1px solid #222222;
+                border-radius: 25px;
+                background: qlineargradient(
+                    x1: 0,
+                    y1: 0,
+                    x2: 0,
+                    y2: 1,
+                    stop: 0 #1A1A1A,
+                    stop: 1 #121212
+                );
+            }
+            """
+        )
 
 
 class ClusterScreen(QWidget):
@@ -144,16 +169,31 @@ class ClusterScreen(QWidget):
         grid.setContentsMargins(42, 28, 42, 24)
         grid.setSpacing(30)
 
-        self.speed_gauge = SegmentedGauge("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH, segments=38, value_font_size=72)
+        self.speed_gauge = SegmentedGauge("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH, segments=40, value_font_size=72)
         self.center_panel = CenterPanel()
-        self.power_gauge = SegmentedGauge("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=34, value_font_size=64)
+        self.power_gauge = SegmentedGauge("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=40, value_font_size=64)
+
+        left_panel = CockpitPanel()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(14, 14, 14, 14)
+        left_layout.addWidget(self.speed_gauge)
+
+        center_panel = CockpitPanel()
+        center_layout = QVBoxLayout(center_panel)
+        center_layout.setContentsMargins(14, 14, 14, 14)
+        center_layout.addWidget(self.center_panel)
+
+        right_panel = CockpitPanel()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(14, 14, 14, 14)
+        right_layout.addWidget(self.power_gauge)
 
         self.bottom_bar = BottomBarStrip()
         self.bottom_bar.tech_button.clicked.connect(self.tech_requested.emit)
 
-        grid.addWidget(self.speed_gauge, 0, 0)
-        grid.addWidget(self.center_panel, 0, 1)
-        grid.addWidget(self.power_gauge, 0, 2)
+        grid.addWidget(left_panel, 0, 0)
+        grid.addWidget(center_panel, 0, 1)
+        grid.addWidget(right_panel, 0, 2)
         grid.addWidget(self.bottom_bar, 1, 0, 1, 3)
 
         grid.setColumnStretch(0, 2)
