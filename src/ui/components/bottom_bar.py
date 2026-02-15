@@ -1,75 +1,64 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, pyqtProperty
-from PyQt6.QtGui import QColor, QPainter
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QProgressBar, QVBoxLayout, QWidget
 
 
 class TemperatureStrip(QWidget):
     def __init__(self, title: str, maximum: float, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._title = title
         self._max = maximum
-        self._display = 0.0
-
-        self._anim = QPropertyAnimation(self, b"displayTemp", self)
-        self._anim.setDuration(260)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.setStyleSheet("background: transparent; border: none;")
-        root = QHBoxLayout(self)
+
+        root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(10)
+        root.setSpacing(6)
+
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
 
         self.label = QLabel(title)
-        self.label.setStyleSheet("color: #7E8B97; font-size: 12px; letter-spacing: 2px; background: transparent; border: none;")
+        self.label.setStyleSheet(
+            "color: #7E8B97; font-size: 12px; letter-spacing: 2px; font-weight: 600; background: transparent; border: none;"
+        )
+
         self.value = QLabel("--°C")
-        self.value.setStyleSheet("color: #EAF7FF; font-size: 20px; font-weight: 600; background: transparent; border: none;")
+        self.value.setStyleSheet(
+            "color: #EAF7FF; font-size: 18px; font-weight: 700; background: transparent; border: none;"
+        )
 
-        root.addWidget(self.label, 0, Qt.AlignmentFlag.AlignVCenter)
-        root.addStretch(1)
-        root.addWidget(self.value, 0, Qt.AlignmentFlag.AlignVCenter)
+        head.addWidget(self.label)
+        head.addStretch(1)
+        head.addWidget(self.value)
 
-        self.setMinimumHeight(34)
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 100)
+        self.bar.setTextVisible(False)
+        self.bar.setFixedHeight(6)
+        self.bar.setStyleSheet(
+            """
+            QProgressBar {
+                border: none;
+                border-radius: 3px;
+                background-color: #1B1B1B;
+            }
+            QProgressBar::chunk {
+                border-radius: 3px;
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00ff00, stop:1 #ff0000);
+            }
+            """
+        )
+
+        root.addLayout(head)
+        root.addWidget(self.bar)
 
     def set_temp(self, value: float) -> None:
         clamped = max(0.0, min(self._max, float(value)))
-        self._anim.stop()
-        self._anim.setStartValue(self._display)
-        self._anim.setEndValue(clamped)
-        self._anim.start()
-
-    @pyqtProperty(float)
-    def displayTemp(self) -> float:  # noqa: N802
-        return self._display
-
-    @displayTemp.setter
-    def displayTemp(self, value: float) -> None:  # noqa: N802
-        self._display = float(value)
-        self.value.setText(f"{self._display:.0f}°C")
-        self.update()
-
-    def paintEvent(self, event) -> None:  # noqa: N802
-        super().paintEvent(event)
-        _ = event
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        bar_rect = self.rect().adjusted(0, self.height() - 8, 0, -2)
-        bar_rect.setHeight(6)
-
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#1B1B1B"))
-        painter.drawRoundedRect(bar_rect, 3, 3)
-
-        ratio = 0.0 if self._max <= 0 else max(0.0, min(1.0, self._display / self._max))
-        fill_width = int(bar_rect.width() * ratio)
-        if fill_width <= 0:
-            return
-
-        fill_rect = bar_rect.adjusted(0, 0, -(bar_rect.width() - fill_width), 0)
-        painter.setBrush(QColor("#18BAFF"))
-        painter.drawRoundedRect(fill_rect, 3, 3)
+        ratio = 0.0 if self._max <= 0 else clamped / self._max
+        self.value.setText(f"{clamped:.0f}°C")
+        self.bar.setValue(int(ratio * 100))
 
 
 class NavButton(QPushButton):
@@ -77,25 +66,36 @@ class NavButton(QPushButton):
         super().__init__(text, parent)
         self._active = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet("background: transparent; border: none;")
+        self.setMinimumHeight(30)
+        self.setStyleSheet(
+            """
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #555555;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                color: #b8d8f0;
+            }
+            """
+        )
 
     def set_active(self, active: bool) -> None:
         self._active = active
-        self.update()
-
-    def paintEvent(self, event) -> None:  # noqa: N802
-        _ = event
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        color = QColor("#FFFFFF") if self._active else QColor("#555555")
-        painter.setPen(color)
-        painter.setFont(self.font())
-        painter.drawText(self.rect().adjusted(0, 0, 0, -8), Qt.AlignmentFlag.AlignCenter, self.text())
-        if self._active:
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor("#179BFF"))
-            bar = self.rect().adjusted(self.width() // 3, self.height() - 5, -(self.width() // 3), -1)
-            painter.drawRoundedRect(bar, 2, 2)
+        self.setStyleSheet(
+            """
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: %s;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            """
+            % ("#FFFFFF" if active else "#555555")
+        )
 
 
 class BottomBar(QWidget):
@@ -105,11 +105,11 @@ class BottomBar(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(16)
+        root.setSpacing(18)
 
         temp_row = QHBoxLayout()
         temp_row.setContentsMargins(0, 0, 0, 0)
-        temp_row.setSpacing(40)
+        temp_row.setSpacing(30)
 
         self.motor_strip = TemperatureStrip("MOTEUR", 120.0)
         self.battery_strip = TemperatureStrip("BATTERIE", 80.0)
@@ -118,7 +118,7 @@ class BottomBar(QWidget):
         temp_row.addWidget(self.battery_strip, 1)
 
         nav_row = QHBoxLayout()
-        nav_row.setContentsMargins(120, 0, 120, 0)
+        nav_row.setContentsMargins(100, 0, 100, 0)
         nav_row.setSpacing(26)
 
         self.cluster_button = NavButton("CLUSTER")
@@ -126,9 +126,9 @@ class BottomBar(QWidget):
         self.graphs_button = NavButton("GRAPHS")
         self.cluster_button.set_active(True)
 
-        for btn in (self.cluster_button, self.tech_button, self.graphs_button):
-            btn.setMinimumHeight(30)
-            nav_row.addWidget(btn)
+        nav_row.addWidget(self.cluster_button)
+        nav_row.addWidget(self.tech_button)
+        nav_row.addWidget(self.graphs_button)
 
         root.addLayout(temp_row)
         root.addLayout(nav_row)
