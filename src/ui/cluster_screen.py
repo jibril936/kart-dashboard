@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, pyqtProperty, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter
+import math
+
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, Qt, pyqtProperty, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QRadialGradient
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
@@ -28,7 +30,7 @@ class SegmentedGauge(QWidget):
         super().__init__(parent)
         self._min = float(minimum)
         self._max = float(maximum)
-        self._segments = 40 if int(segments) != 40 else int(segments)
+        self._segments = 42 if int(segments) != 42 else int(segments)
         self._value = self._min
         self._display_value = self._min
         self._unit = unit
@@ -62,8 +64,8 @@ class SegmentedGauge(QWidget):
         self.setGraphicsEffect(glow)
 
         self._anim = QPropertyAnimation(self, b"displayValue", self)
-        self._anim.setDuration(260)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setDuration(200)
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
     def set_value(self, value: float) -> None:
         self._value = max(self._min, min(self._max, float(value)))
@@ -95,13 +97,27 @@ class SegmentedGauge(QWidget):
         h = float(self.height())
         radius = min(w, h) * 0.34
         center_x = w / 2
-        center_y = h / 2 + 6
+        center_y = h / 2 + 8
+
+        arc_rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
+
+        base_glow = QRadialGradient(center_x, center_y, radius * 1.22)
+        base_glow.setColorAt(0.0, QColor(10, 24, 36, 8))
+        base_glow.setColorAt(0.55, QColor(11, 34, 48, 30))
+        base_glow.setColorAt(1.0, QColor(8, 14, 18, 0))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(base_glow)
+        painter.drawEllipse(arc_rect.adjusted(-32, -32, 32, 32))
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor("#18232D"), 26, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(arc_rect, int(-220 * 16), int(260 * 16))
 
         ratio = 0.0 if self._max == self._min else (self._display_value - self._min) / (self._max - self._min)
         active_segments = int(max(0.0, min(1.0, ratio)) * self._segments)
 
-        start_angle = -215.0
-        sweep = 250.0
+        start_angle = -220.0
+        sweep = 260.0
         angle_step = sweep / max(1, self._segments - 1)
 
         for index in range(self._segments):
@@ -115,14 +131,34 @@ class SegmentedGauge(QWidget):
             if index < active_segments:
                 painter.setBrush(QColor("#00FFFF"))
                 painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawRect(-4, -16, 8, 28)
-                painter.setBrush(QColor("#00FFFF"))
+                painter.drawRect(-5, -18, 10, 30)
+                painter.setBrush(QColor(163, 249, 255, 110))
+                painter.drawRect(-2, -16, 4, 26)
             else:
-                painter.setBrush(QColor("#252525"))
+                painter.setBrush(QColor("#242F39"))
 
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(-2, -14, 4, 24)
             painter.restore()
+
+        ratio_angle = start_angle + (max(0.0, min(1.0, ratio)) * sweep)
+        pointer_rad = math.radians(ratio_angle)
+        tail = radius * 0.10
+        tip = radius * 0.78
+        tip_x = center_x + math.cos(pointer_rad) * tip
+        tip_y = center_y + math.sin(pointer_rad) * tip
+        tail_x = center_x - math.cos(pointer_rad) * tail
+        tail_y = center_y - math.sin(pointer_rad) * tail
+
+        painter.setPen(QPen(QColor(91, 236, 255, 100), 8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(int(tail_x), int(tail_y), int(tip_x), int(tip_y))
+        painter.setPen(QPen(QColor("#F2FCFF"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(int(tail_x), int(tail_y), int(tip_x), int(tip_y))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#9FE9FF"))
+        painter.drawEllipse(int(center_x - 7), int(center_y - 7), 14, 14)
+        painter.setBrush(QColor("#121C24"))
+        painter.drawEllipse(int(center_x - 3), int(center_y - 3), 6, 6)
 
         painter.setPen(QColor("#FFFFFF"))
         painter.setFont(QFont("Roboto Mono", self._value_font_size, QFont.Weight.Bold))
