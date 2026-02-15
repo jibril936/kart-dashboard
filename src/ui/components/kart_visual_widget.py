@@ -15,9 +15,9 @@ class KartVisualWidget(QWidget):
         self.setStyleSheet(
             """
             QWidget {
-                background-color: #1a2634;
+                background-color: #0b1118;
                 border-radius: 12px;
-                border: 1px solid #2c3e50;
+                border: 1px solid #203646;
             }
             QLabel {
                 background-color: transparent;
@@ -53,20 +53,20 @@ class KartVisualWidget(QWidget):
             QPointF(cx - chassis_bottom_half, bottom_y),
         ]
 
-        chassis_pen = QPen(QColor("#00FFFF"), 3)
+        chassis_pen = QPen(QColor("#75afd4"), 2.6)
         painter.setPen(chassis_pen)
-        painter.setBrush(QBrush(QColor(0, 255, 255, 40)))
+        painter.setBrush(QBrush(QColor(86, 138, 176, 42)))
         painter.drawPolygon(chassis_points)
 
         cockpit_w = w * 0.14
         cockpit_h = h * 0.1
         cockpit_rect = QRectF(cx - cockpit_w * 0.5, pad_y + (h * 0.44), cockpit_w, cockpit_h)
-        painter.setPen(QPen(QColor("#8da7be"), 2))
+        painter.setPen(QPen(QColor("#8da7be"), 1.8))
         painter.setBrush(QColor(12, 20, 30, 190))
         painter.drawEllipse(cockpit_rect)
 
-        rear_wheel_color = QColor("#707070")
-        front_wheel_color = QColor("#00FFFF")
+        rear_wheel_color = QColor("#64788a")
+        front_wheel_color = QColor("#8dc8f0")
 
         rear_w = w * 0.09
         rear_h = h * 0.2
@@ -78,8 +78,8 @@ class KartVisualWidget(QWidget):
 
         painter.setPen(QPen(rear_wheel_color, 2))
         painter.setBrush(QColor(120, 120, 120, 80))
-        painter.drawRect(rear_left_rect)
-        painter.drawRect(rear_right_rect)
+        painter.drawRoundedRect(rear_left_rect, 4, 4)
+        painter.drawRoundedRect(rear_right_rect, 4, 4)
 
         front_w = w * 0.08
         front_h = h * 0.18
@@ -87,7 +87,7 @@ class KartVisualWidget(QWidget):
         front_offset = w * 0.2
 
         painter.setPen(QPen(front_wheel_color, 2))
-        painter.setBrush(QColor(0, 255, 255, 60))
+        painter.setBrush(QColor(111, 177, 221, 65))
 
         front_left_center = QPointF(cx - front_offset, front_center_y)
         front_right_center = QPointF(cx + front_offset, front_center_y)
@@ -102,9 +102,16 @@ class KartVisualWidget(QWidget):
         painter.drawLine(QPointF(rear_left_rect.center().x(), rear_axle_y), QPointF(rear_right_rect.center().x(), rear_axle_y))
         painter.drawLine(QPointF(front_left_center.x(), front_center_y), QPointF(front_right_center.x(), front_center_y))
 
+        painter.setPen(QPen(QColor("#9ecbe8"), 1.0))
+        painter.drawText(
+            QRectF(0, self.height() - 26, self.width(), 20),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            f"{self._steering_angle_deg:+.1f}°",
+        )
+
     def _draw_rotated_wheel(self, painter: QPainter, center: QPointF, width: float, height: float, angle: float) -> None:
         painter.save()
         painter.translate(center)
         painter.rotate(angle)
-        painter.drawRect(QRectF(-width * 0.5, -height * 0.5, width, height))
+        painter.drawRoundedRect(QRectF(-width * 0.5, -height * 0.5, width, height), 4, 4)
         painter.restore()
