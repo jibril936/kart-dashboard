@@ -2,16 +2,9 @@ from __future__ import annotations
 
 import math
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QPointF, QRectF, Qt, pyqtProperty, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import (
-    QGraphicsDropShadowEffect,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, Qt, pyqtProperty, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QPainter
+from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from src.core.state import VehicleTechState
 from src.ui.components.bottom_bar import BottomBarStrip
@@ -23,77 +16,21 @@ POWER_MIN_KW = -12.0
 POWER_MAX_KW = 12.0
 
 
-class SegmentedGauge(QWidget):
-    def __init__(self, title: str, unit: str, minimum: float, maximum: float, segments: int = 36, parent: QWidget | None = None) -> None:
+class SegmentsArc(QWidget):
+    def __init__(self, segments: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._title = title
-        self._unit = unit
-        self._min = float(minimum)
-        self._max = float(maximum)
-        self._value = self._min
-        self._display_value = self._min
         self._segments = segments
-
-        self.setMinimumSize(260, 260)
+        self._active = 0
         self.setStyleSheet("background: transparent; border: none;")
 
-        self._anim = QPropertyAnimation(self, b"displayValue", self)
-        self._anim.setDuration(240)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        self._value_label = QLabel("0")
-        self._value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._value_label.setStyleSheet("color: #F1F7FF; border: none; background: transparent;")
-        self._value_label.setFont(QFont("Bahnschrift", 46, QFont.Weight.Bold))
-
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(30)
+        glow.setBlurRadius(26)
         glow.setOffset(0, 0)
-        glow.setColor(QColor("#179BFF"))
-        self._value_label.setGraphicsEffect(glow)
+        glow.setColor(QColor("#19C8FF"))
+        self.setGraphicsEffect(glow)
 
-        self._unit_label = QLabel(unit)
-        self._unit_label.setStyleSheet("color: #7d95ae; font-size: 14px; border: none; background: transparent;")
-
-        self._title_label = QLabel(title)
-        self._title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._title_label.setStyleSheet("color: #7d95ae; font-size: 13px; letter-spacing: 2px; border: none; background: transparent;")
-
-        value_row = QHBoxLayout()
-        value_row.setContentsMargins(0, 0, 0, 0)
-        value_row.setSpacing(6)
-        value_row.addStretch(1)
-        value_row.addWidget(self._value_label)
-        value_row.addWidget(self._unit_label, 0, Qt.AlignmentFlag.AlignBottom)
-        value_row.addStretch(1)
-
-        root = QVBoxLayout(self)
-        root.setContentsMargins(18, 18, 18, 18)
-        root.setSpacing(0)
-        root.addWidget(self._title_label)
-        root.addStretch(1)
-        root.addLayout(value_row)
-        root.addStretch(1)
-
-    def set_value(self, value: float) -> None:
-        self._value = max(self._min, min(self._max, float(value)))
-        self._anim.stop()
-        self._anim.setStartValue(self._display_value)
-        self._anim.setEndValue(self._value)
-        self._anim.start()
-
-    @pyqtProperty(float)
-    def displayValue(self) -> float:  # noqa: N802
-        return self._display_value
-
-    @displayValue.setter
-    def displayValue(self, value: float) -> None:  # noqa: N802
-        self._display_value = float(value)
-        shown = int(round(self._display_value)) if self._unit == "km/h" else self._display_value
-        if self._unit == "kW":
-            self._value_label.setText(f"{shown:+.1f}")
-        else:
-            self._value_label.setText(f"{shown:d}")
+    def set_active(self, value: int) -> None:
+        self._active = max(0, min(self._segments, int(value)))
         self.update()
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -101,30 +38,101 @@ class SegmentedGauge(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        zone = QRectF(self.rect()).adjusted(18, 18, -18, -18)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#151515"))
-        painter.drawRoundedRect(zone, 12, 12)
+        rect = QRectF(self.rect()).adjusted(10, 10, -10, -10)
+        center = rect.center()
+        radius = min(rect.width(), rect.height()) * 0.44
 
-        center = zone.center()
-        radius = min(zone.width(), zone.height()) * 0.43
-        start = 210.0
-        span = 300.0
-        seg_angle = span / self._segments
-        ratio = 0.0 if self._max == self._min else (self._display_value - self._min) / (self._max - self._min)
-        active = int(max(0, min(self._segments, round(ratio * self._segments))))
+        start_angle = 215.0
+        span = 290.0
+        for index in range(self._segments):
+            t = index / max(1, self._segments - 1)
+            angle = math.radians(start_angle - t * span)
 
-        for idx in range(self._segments):
-            a0 = start - idx * seg_angle
-            a1 = a0 - seg_angle * 0.58
-            p0 = QPointF(center.x() + radius * math.cos(math.radians(a0)), center.y() - radius * math.sin(math.radians(a0)))
-            p1 = QPointF(center.x() + radius * math.cos(math.radians(a1)), center.y() - radius * math.sin(math.radians(a1)))
-            if idx < active:
-                glow = 80 + int(140 * (idx / max(1, self._segments - 1)))
-                painter.setPen(QPen(QColor(40, 165, 255, glow), 5.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            cx = center.x() + radius * math.cos(angle)
+            cy = center.y() - radius * math.sin(angle)
+
+            painter.save()
+            painter.translate(cx, cy)
+            painter.rotate(-(start_angle - t * span) + 90)
+
+            if index < self._active:
+                painter.setBrush(QColor("#56D8FF"))
             else:
-                painter.setPen(QPen(QColor(50, 50, 50, 90), 4.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            painter.drawLine(p0, p1)
+                painter.setBrush(QColor("#222222"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(QRectF(-3.0, -11.0, 6.0, 16.0), 2.0, 2.0)
+            painter.restore()
+
+
+class SegmentedGauge(QWidget):
+    def __init__(self, title: str, unit: str, minimum: float, maximum: float, segments: int, value_size: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._min = float(minimum)
+        self._max = float(maximum)
+        self._value = self._min
+        self._display = self._min
+        self._unit = unit
+        self._segments = segments
+
+        self.setStyleSheet("background: transparent; border: none;")
+        self.setMinimumSize(280, 360)
+
+        self._anim = QPropertyAnimation(self, b"displayValue", self)
+        self._anim.setDuration(260)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(2)
+
+        self.title_label = QLabel(title)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setStyleSheet("color: #66727B; letter-spacing: 3px; background: transparent; border: none;")
+        self.title_label.setFont(QFont("Inter", 12, QFont.Weight.Medium))
+
+        self.arc = SegmentsArc(segments)
+
+        self.value_label = QLabel("0")
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setStyleSheet("color: #FFFFFF; background: transparent; border: none;")
+        self.value_label.setFont(QFont("Inter", value_size, QFont.Weight.Bold))
+
+        self.unit_label = QLabel(unit)
+        self.unit_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.unit_label.setStyleSheet("color: #7B8791; background: transparent; border: none;")
+        self.unit_label.setFont(QFont("Inter", 14, QFont.Weight.Medium))
+
+        root.addWidget(self.title_label)
+        root.addWidget(self.arc, 1)
+        root.addWidget(self.value_label)
+        root.addWidget(self.unit_label)
+
+    def set_value(self, value: float) -> None:
+        self._value = max(self._min, min(self._max, float(value)))
+        self._anim.stop()
+        self._anim.setStartValue(self._display)
+        self._anim.setEndValue(self._value)
+        self._anim.start()
+
+    @pyqtProperty(float)
+    def displayValue(self) -> float:  # noqa: N802
+        return self._display
+
+    @displayValue.setter
+    def displayValue(self, value: float) -> None:  # noqa: N802
+        self._display = float(value)
+        ratio = 0.0 if self._max == self._min else (self._display - self._min) / (self._max - self._min)
+        self.arc.set_active(round(max(0.0, min(1.0, ratio)) * self._segments))
+        if self._unit == "km/h":
+            self.value_label.setText(f"{int(round(self._display))}")
+        else:
+            self.value_label.setText(f"{self._display:+.1f}")
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        _ = event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
 
 class ClusterScreen(QWidget):
@@ -133,78 +141,39 @@ class ClusterScreen(QWidget):
     def __init__(self, ui_scale: float = 1.0, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._base_ui_scale = ui_scale
-        self._effective_scale = ui_scale
+
         self.setObjectName("ClusterScreen")
-        self.setStyleSheet(
-            """
-            #ClusterScreen { background: #0A0A0A; border: none; }
-            QWidget { border: none; }
-            QPushButton#TechButton {
-                background: #151515;
-                color: #dbe7f7;
-                border: none;
-                border-radius: 12px;
-                padding: 8px 16px;
-                font-size: 13px;
-                letter-spacing: 1px;
-            }
-            QPushButton#TechButton:hover { background: #1d1d1d; }
-            """
-        )
+        self.setStyleSheet("#ClusterScreen { background: #050505; border: none; } QWidget { border: none; }")
 
-        self.root = QVBoxLayout(self)
-        self.root.setContentsMargins(22, 16, 22, 14)
-        self.root.setSpacing(12)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(44, 28, 44, 24)
+        root.setSpacing(18)
 
-        self.top_bar = QHBoxLayout()
-        self.top_bar.setSpacing(10)
+        top_zone = QHBoxLayout()
+        top_zone.setContentsMargins(0, 0, 0, 0)
+        top_zone.setSpacing(30)
 
-        self.tech_button = QPushButton("TECH")
-        self.tech_button.setObjectName("TechButton")
-        self.tech_button.clicked.connect(self.tech_requested.emit)
-
-        self.top_bar.addStretch(1)
-        self.top_bar.addWidget(self.tech_button)
-        self.root.addLayout(self.top_bar)
-
-        self.middle = QHBoxLayout()
-        self.middle.setSpacing(18)
-
-        self.speed_gauge = SegmentedGauge("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH)
+        self.speed_gauge = SegmentedGauge("SPEED", "km/h", SPEED_MIN_KMH, SPEED_MAX_KMH, segments=40, value_size=80)
         self.center_panel = CenterPanel()
-        self.power_gauge = SegmentedGauge("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=28)
+        self.power_gauge = SegmentedGauge("POWER", "kW", POWER_MIN_KW, POWER_MAX_KW, segments=30, value_size=40)
 
-        self.middle.addWidget(self.speed_gauge, 2)
-        self.middle.addWidget(self.center_panel, 3)
-        self.middle.addWidget(self.power_gauge, 2)
-        self.root.addLayout(self.middle, 1)
+        top_zone.addWidget(self.speed_gauge, 2)
+        top_zone.addWidget(self.center_panel, 3)
+        top_zone.addWidget(self.power_gauge, 2)
 
         self.bottom_bar = BottomBarStrip()
-        self.root.addWidget(self.bottom_bar)
-        self._apply_responsive_layout()
+        self.bottom_bar.tech_button.clicked.connect(self.tech_requested.emit)
 
-    def _apply_responsive_layout(self) -> None:
-        compact = self.width() < 1200 or self.height() < 680
-        self._effective_scale = max(0.8, min(1.2, self._base_ui_scale * (0.9 if compact else 1.0)))
-        s = self._effective_scale
-        self.root.setContentsMargins(int(18 * s), int(14 * s), int(18 * s), int(12 * s))
-        self.middle.setSpacing(int(14 * s))
-        self.center_panel.set_compact_mode(compact, s)
-        self.center_panel.kart_widget.set_compact_mode(compact, s)
-
-    def resizeEvent(self, event) -> None:  # noqa: N802
-        super().resizeEvent(event)
-        self._apply_responsive_layout()
+        root.addLayout(top_zone, 1)
+        root.addWidget(self.bottom_bar)
 
     def render(self, state: VehicleTechState) -> None:
         speed = state.speed_kmh
         steering_angle = state.steering_angle_deg
         charging = state.charging_state
         battery_v = state.battery_voltage_V
-        brake = state.brake_state
         motor_temp = state.motor_temp_C
 
-        self.speed_gauge.setVisible(speed is not None)
         if speed is not None:
             self.speed_gauge.set_value(float(speed))
 
@@ -223,8 +192,6 @@ class ClusterScreen(QWidget):
         if battery_v is not None and battery_current is not None:
             self.power_gauge.set_value((float(battery_v) * float(battery_current)) / 1000.0)
 
-        _ = brake
-
         self.bottom_bar.set_values(
             battery_voltage=battery_v,
             battery_soc_percent=None,
@@ -236,10 +203,4 @@ class ClusterScreen(QWidget):
         _ = event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        rect = QRectF(self.rect())
-        painter.fillRect(rect, QColor("#0A0A0A"))
-
-        painter.setPen(QPen(QColor(255, 255, 255, 18), 1.0))
-        frame = rect.adjusted(10, 8, -10, -8)
-        painter.drawRoundedRect(frame, 14, 14)
+        painter.fillRect(self.rect(), QColor("#050505"))
