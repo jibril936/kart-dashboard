@@ -1,27 +1,27 @@
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget
-
-from src.core.state_store import StateStore
+from qtpy.QtWidgets import QMainWindow, QStackedWidget
+from qtpy.QtCore import Qt
 from src.ui.screens.cluster_page import ClusterPage
-
+from src.ui.screens.expert_page import ExpertPage
 
 class MainWindow(QMainWindow):
-    """Dashboard shell with a primary cluster page."""
-
-    # On ajoute 'store' ici pour qu'il accepte l'argument envoyé par main.py
-    def __init__(self, store: StateStore) -> None:
+    def __init__(self, store):
         super().__init__()
-        self.setWindowTitle("Kart Dashboard")
+        self.store = store
         self.resize(1024, 600)
-        self.setStyleSheet("background-color: #000000;")
-
-        self.stack = QStackedWidget(self)
+        
+        self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
+        
+        # Création des pages
+        self.page_cluster = ClusterPage(self.store)
+        self.page_expert = ExpertPage(self.store)
+        
+        self.stack.addWidget(self.page_cluster)
+        self.stack.addWidget(self.page_expert)
 
-        # On utilise le store passé en paramètre au lieu d'en créer un nouveau !
-        self.store = store 
-        
-        # On passe ce même store à la ClusterPage
-        self.cluster_page = ClusterPage(self.store, self)
-        
-        self.stack.addWidget(self.cluster_page)
-        self.stack.setCurrentWidget(self.cluster_page)
+    def keyPressEvent(self, event):
+        # Touche 1 -> Pilotage / Touche 2 -> Diagnostic
+        if event.key() == Qt.Key.Key_1:
+            self.stack.setCurrentIndex(0)
+        elif event.key() == Qt.Key.Key_2:
+            self.stack.setCurrentIndex(1)

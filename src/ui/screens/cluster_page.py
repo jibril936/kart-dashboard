@@ -1,68 +1,88 @@
-from qtpy.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel
+from qtpy.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
 from qtpy.QtCore import Qt, Slot
 from src.ui.components.analog_gauge import AnalogGaugeWidget
-from src.ui.components.battery_icon import BatteryIcon
+from src.ui.components.temperature_widget import TemperatureWidget
+from src.ui.components.pack_battery_widget import PackBatteryWidget
 
 class ClusterPage(QWidget):
     def __init__(self, store, parent=None):
         super().__init__(parent)
         self.store = store
         self.v_temp = 0.0
+        # Force le fond noir et l'application du style
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("background-color: black;")
         self.setup_ui()
         self.connect_signals()
 
     def setup_ui(self):
-        self.setStyleSheet("background-color: black;")
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(30, 30, 30, 30)
-        self.main_layout.setSpacing(20)
+        # Layout Principal (Vertical)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.main_layout.setSpacing(0)
 
-        # --- GAUCHE : VITESSE (0-70 km/h, pas de 10) ---
-        # scalaCount=7 donnera : 0, 10, 20, 30, 40, 50, 60, 70
-        self.speed_gauge = AnalogGaugeWidget(minValue=0, maxValue=70, units="km/h", scalaCount=7, parent=self)
-        self.main_layout.addWidget(self.speed_gauge, stretch=2)
+        # 1. Pousse tout vers le bas pour libérer le haut (Zone Alertes)
+        self.main_layout.addStretch(1)
 
-        # --- CENTRE : BATTERIE & INFOS ---
-        self.center_block = QVBoxLayout()
-        self.center_block.setSpacing(5)
-        self.center_block.addStretch()
+        # 2. LA LIGNE DES COMPTEURS (Horizontale)
+        self.content_layout = QHBoxLayout()
+        self.content_layout.setSpacing(10)
 
-        self.batt_icon = BatteryIcon(self)
-        self.soc_label = QLabel("0%")
-        self.soc_label.setStyleSheet("color: white; font-size: 40px; font-family: 'Orbitron'; font-weight: bold;")
-        self.volt_label = QLabel("0.0V")
-        self.volt_label.setStyleSheet("color: #888888; font-size: 22px; font-family: 'Orbitron';")
-
-        self.center_block.addWidget(self.batt_icon, alignment=Qt.AlignCenter)
-        self.center_block.addWidget(self.soc_label, alignment=Qt.AlignCenter)
-        self.center_block.addWidget(self.volt_label, alignment=Qt.AlignCenter)
-        self.center_block.addStretch()
+        # --- COLONNE GAUCHE (Vitesse + Temp Moteur) ---
+        self.left_col = QVBoxLayout()
+        self.speed_gauge = AnalogGaugeWidget(minValue=0, maxValue=70, units="km/h", scalaCount=7)
+        self.speed_gauge.setMinimumSize(350, 350)
+        self.motor_temp = TemperatureWidget("MOTOR TEMP")
         
-        self.main_layout.addLayout(self.center_block, stretch=1)
+        self.left_col.addWidget(self.speed_gauge, alignment=Qt.AlignCenter)
+        self.left_col.addWidget(self.motor_temp, alignment=Qt.AlignCenter)
+        self.content_layout.addLayout(self.left_col)
 
-        # --- DROITE : PUISSANCE (-2 à +10 kW, pas de 2) ---
-        # scalaCount=6 donnera : -2, 0, 2, 4, 6, 8, 10
-        self.power_gauge = AnalogGaugeWidget(minValue=-2, maxValue=10, units="kW", scalaCount=6, parent=self)
-        self.main_layout.addWidget(self.power_gauge, stretch=2)
+        # --- COLONNE CENTRALE (Batterie %) ---
+        self.center_col = QVBoxLayout()
+        self.pack_status = PackBatteryWidget()
+        # On ajoute un gros spacer pour que la batterie soit alignée sur les textes du bas
+        self.center_col.addStretch(5) 
+        self.center_col.addWidget(self.pack_status, alignment=Qt.AlignCenter)
+        self.center_col.addStretch(1)
+        self.content_layout.addLayout(self.center_col)
+
+        # --- COLONNE DROITE (Puissance + Temp Batterie) ---
+        self.right_col = QVBoxLayout()
+        self.power_gauge = AnalogGaugeWidget(minValue=-2, maxValue=10, units="kW", scalaCount=6)
+        self.power_gauge.setMinimumSize(350, 350)
+        self.batt_temp = TemperatureWidget("BATT TEMP")
+        
+        self.right_col.addWidget(self.power_gauge, alignment=Qt.AlignCenter)
+        self.right_col.addWidget(self.batt_temp, alignment=Qt.AlignCenter)
+        self.content_layout.addLayout(self.right_col)
+
+        self.main_layout.addLayout(self.content_layout)
+        
+        # 3. Petit espace en bas
+        self.main_layout.addStretch(1)
 
     def connect_signals(self):
         self.store.speed_changed.connect(self.speed_gauge.setValue)
         self.store.pack_current_changed.connect(self._on_current)
         self.store.pack_voltage_changed.connect(self._on_voltage)
         self.store.soc_changed.connect(self._on_soc)
+        
+        if hasattr(self.store, 'motor_temp_changed'):
+            self.store.motor_temp_changed.connect(self.motor_temp.set_value)
+        if hasattr(self.store, 'batt_temp_changed'):
+            self.store.batt_temp_changed.connect(self.batt_temp.set_value)
 
     @Slot(float)
     def _on_current(self, amps):
-        # Calcul kW
         kw = (self.v_temp * amps) / 1000.0
         self.power_gauge.setValue(kw)
 
     @Slot(float)
     def _on_voltage(self, volts):
         self.v_temp = volts
-        self.volt_label.setText(f"{volts:.1f}V")
+        self.pack_status.update_status(self.store.get_soc())
 
     @Slot(int)
     def _on_soc(self, val):
-        self.soc_label.setText(f"{val}%")
-        self.batt_icon.set_value(val)
+        self.pack_status.update_status(val)
