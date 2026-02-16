@@ -1,8 +1,11 @@
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget
 
+from src.core.state_store import StateStore
+from src.ui.screens.cluster_page import ClusterPage
+
 
 class MainWindow(QMainWindow):
-    """Minimal dashboard shell with an empty stacked widget."""
+    """Dashboard shell with a primary cluster page."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -12,3 +15,8 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget(self)
         self.setCentralWidget(self.stack)
+
+        self.store = StateStore()
+        self.cluster_page = ClusterPage(self.store, self)
+        self.stack.addWidget(self.cluster_page)
+        self.stack.setCurrentWidget(self.cluster_page)
