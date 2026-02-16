@@ -2,7 +2,12 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 class StateStore(QObject):
     """Central state and signal hub for ALL BMS and Vehicle data."""
+# Dans src/core/state_store.py
 
+    def get_soc(self):
+        """Retourne le pourcentage de batterie (soc) ou 0 par défaut"""
+        # getattr permet d'éviter le crash si 'soc' n'est pas encore créé
+        return getattr(self, 'soc', 0)
     # --- VEHICLE ---
     speed_changed = pyqtSignal(float)
     steer_angle_changed = pyqtSignal(float)
