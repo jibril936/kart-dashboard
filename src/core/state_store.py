@@ -11,6 +11,7 @@ class StateStore(QObject):
     motor_temp_changed = pyqtSignal(float)
 
     # BMS
+    soc_changed = pyqtSignal(int)
     pack_voltage_changed = pyqtSignal(float)
     pack_current_changed = pyqtSignal(float)
     cell_voltages_changed = pyqtSignal(list)

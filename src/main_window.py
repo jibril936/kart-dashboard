@@ -7,7 +7,8 @@ from src.ui.screens.cluster_page import ClusterPage
 class MainWindow(QMainWindow):
     """Dashboard shell with a primary cluster page."""
 
-    def __init__(self) -> None:
+    # On ajoute 'store' ici pour qu'il accepte l'argument envoyé par main.py
+    def __init__(self, store: StateStore) -> None:
         super().__init__()
         self.setWindowTitle("Kart Dashboard")
         self.resize(1024, 600)
@@ -16,7 +17,11 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self)
         self.setCentralWidget(self.stack)
 
-        self.store = StateStore()
+        # On utilise le store passé en paramètre au lieu d'en créer un nouveau !
+        self.store = store 
+        
+        # On passe ce même store à la ClusterPage
         self.cluster_page = ClusterPage(self.store, self)
+        
         self.stack.addWidget(self.cluster_page)
         self.stack.setCurrentWidget(self.cluster_page)
