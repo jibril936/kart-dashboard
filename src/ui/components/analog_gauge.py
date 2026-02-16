@@ -1,173 +1,150 @@
 import math
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import (QPolygon, QColor, QPen, QFont, QPainter, 
-                         QFontMetrics, QConicalGradient, QRadialGradient)
-from PyQt6.QtCore import Qt, QPoint, QPointF, QRect, QSize, pyqtSignal
+from qtpy.QtWidgets import QWidget
+from qtpy.QtGui import QPolygon, QColor, QPen, QFont, QPainter
+from qtpy.QtCore import Qt, QPoint, QRect, Signal
 
 class AnalogGaugeWidget(QWidget):
-    valueChanged = pyqtSignal(int)
+    valueChanged = Signal(int)
 
-    def __init__(
-        self, 
-        minValue: float = 0.0, 
-        maxValue: float = 100.0, 
-        units: str = "km/h", 
-        gaugeColor: str = "#00FFFF", 
-        parent=None
-    ):
+    def __init__(self, minValue=0, maxValue=100, units="", gaugeColor="#00FFFF", scalaCount=10, parent=None):
         super().__init__(parent)
-
-        # On utilise les valeurs reçues en paramètres
         self.minValue = minValue
         self.maxValue = maxValue
         self.units = units
-        self.NeedleColor = QColor(gaugeColor) 
-        
-        # Le reste de ta configuration
+        self.gaugeColor = QColor(gaugeColor)
         self.value = minValue
-        self.use_timer_event = False
-        self.DisplayValueColor = QColor(245, 245, 245)
-        self.ScaleValueColor = QColor(200, 200, 200)
-        self.bigScaleMarker = QColor(100, 100, 100)
-        self.fineScaleColor = QColor(50, 50, 50)
+        self.scalaCount = scalaCount 
+        self.subDivCount = 5 # Nombre de petits traits entre chaque gros chiffre
         
         self.scale_angle_start_value = 135
         self.scale_angle_size = 270
-        self.scalaCount = 10
-        self.scala_subdiv_count = 5
-        
-        self.setMinimumSize(250, 250)
-        self.rescale_method()
+        self.setMinimumSize(300, 300)
 
     def setValue(self, value):
-        """Méthode compatible avec ton ClusterPage actuel"""
-        if value <= self.minValue:
-            self.value = self.minValue
-        elif value >= self.maxValue:
-            self.value = self.maxValue
-        else:
-            self.value = value
-        self.update() # Force le redessin
-
-    def rescale_method(self):
-        self.widget_diameter = min(self.width(), self.height())
-        # Définition de la forme de l'aiguille (Polygon)
-        self.value_needle = [QPolygon([
-            QPoint(4, 30),
-            QPoint(-4, 30),
-            QPoint(-2, int(-self.widget_diameter / 2 * 0.8)),
-            QPoint(0, int(-self.widget_diameter / 2 * 0.8 - 6)),
-            QPoint(2, int(-self.widget_diameter / 2 * 0.8))
-        ])]
+        try:
+            val = float(value)
+            self.value = max(self.minValue, min(self.maxValue, val))
+            self.update()
+        except: pass
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # On dessine sur fond noir pur
-        painter.fillRect(self.rect(), QColor(0, 0, 0))
-        
-        self.rescale_method()
-        self.draw_filled_polygon(painter)
-        self.draw_big_scaled_marker(painter)
-        self.create_fine_scaled_marker(painter)
-        self.create_scale_marker_values_text(painter)
-        self.create_values_text(painter)
-        self.draw_needle(painter)
+        w, h = self.width(), self.height()
+        self.diameter = min(w, h)
+        painter.translate(w / 2, h / 2)
 
-    def draw_filled_polygon(self, painter):
+        self.draw_fine_ticks(painter)    # Les petites graduations (nouveauté)
+        self.draw_scale_markers(painter) # Les gros chiffres
+        self.draw_scale(painter)         # L'arc de fond
+        self.draw_progress(painter)      # L'arc coloré
+        self.draw_needle(painter)        # L'aiguille
+        self.draw_digital_value(painter) # Les chiffres numériques remontés
+
+    def draw_fine_ticks(self, painter):
+        """Dessine les petits traits de graduation pour le look 'Pro'"""
         painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.setPen(Qt.PenStyle.NoPen)
-
-        # Création de l'arc de progression
-        # On calcule le ratio de la valeur actuelle pour remplir l'arc
-        progress_ratio = (self.value - self.minValue) / (self.maxValue - self.minValue)
-        current_span = int(self.scale_angle_size * progress_ratio)
-
-        # Dégradé Conique pour l'effet de couleur
-        grad = QConicalGradient(QPointF(0, 0), -self.scale_angle_start_value)
-        grad.setColorAt(0, self.NeedleColor)
-        grad.setColorAt(1, QColor(30, 30, 30))
-        
-        painter.setBrush(grad)
-        
-        # Dessin simplifié de l'arc (plus performant pour la Pi)
-        rect = QRect(int(-self.widget_diameter/2), int(-self.widget_diameter/2), 
-                     self.widget_diameter, self.widget_diameter)
-        painter.drawPie(rect, -self.scale_angle_start_value * 16, -current_span * 16)
-        painter.restore()
-
-    def draw_big_scaled_marker(self, painter):
-        painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        pen = QPen(self.bigScaleMarker)
-        pen.setWidth(2)
+        pen = QPen(QColor(80, 80, 80), 1)
         painter.setPen(pen)
-        painter.rotate(self.scale_angle_start_value)
-        steps_size = (float(self.scale_angle_size) / float(self.scalaCount))
+        
+        total_ticks = self.scalaCount * self.subDivCount
+        radius_outer = self.diameter / 2 - 5
+        radius_inner = self.diameter / 2 - 15
+
+        for i in range(total_ticks + 1):
+            angle = math.radians(self.scale_angle_start_value + (i * self.scale_angle_size / total_ticks))
+            x1 = radius_outer * math.cos(angle)
+            y1 = radius_outer * math.sin(angle)
+            x2 = radius_inner * math.cos(angle)
+            y2 = radius_inner * math.sin(angle)
+            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+        painter.restore()
+
+    def draw_scale(self, painter):
+        painter.save()
+        pen = QPen(QColor(60, 60, 60), 2) # Un peu plus fin pour laisser voir les ticks
+        painter.setPen(pen)
+        painter.drawArc(int(-self.diameter/2 + 5), int(-self.diameter/2 + 5), self.diameter-10, self.diameter-10, 
+                        -self.scale_angle_start_value * 16, -self.scale_angle_size * 16)
+        painter.restore()
+
+    def draw_progress(self, painter):
+        painter.save()
+        val_ratio = (self.value - self.minValue) / (self.maxValue - self.minValue)
+        current_angle = self.scale_angle_start_value + (val_ratio * self.scale_angle_size)
+        pen_width = 8
+        
+        # Logique de couleur Vitesse (Cyan) vs Puissance (Multi-couleur)
+        if self.units == "km/h":
+            color = QColor(0, 255, 255)
+            start_angle = self.scale_angle_start_value
+        else:
+            # Pour les kW, on part toujours du Zéro
+            zero_ratio = (0 - self.minValue) / (self.maxValue - self.minValue)
+            start_angle = self.scale_angle_start_value + (zero_ratio * self.scale_angle_size)
+            
+            if self.value < 0: color = QColor(0, 255, 127)
+            else:
+                pos_ratio = self.value / self.maxValue
+                if pos_ratio < 0.33: color = QColor(255, 255, 0)
+                elif pos_ratio < 0.66: color = QColor(255, 150, 0)
+                else: color = QColor(255, 50, 50)
+
+        painter.setPen(QPen(color, pen_width, Qt.SolidLine, Qt.RoundCap))
+        span = -(current_angle - start_angle)
+        painter.drawArc(int(-self.diameter/2 + 5), int(-self.diameter/2 + 5), self.diameter-10, self.diameter-10, 
+                        int(-start_angle * 16), int(span * 16))
+        painter.restore()
+
+    def draw_digital_value(self, painter):
+        painter.save()
+        # On remonte encore l'ensemble (plus le diviseur est grand, plus on monte)
+        # On passe à 6 pour libérer vraiment le bas du cadran
+        y_base = int(self.diameter / 6.0) 
+        
+        painter.setPen(QColor(255, 255, 255))
+        
+        # 1. CHIFFRE PRINCIPAL (Réduit à 14% du diamètre pour plus de finesse)
+        font_val = QFont("Orbitron", int(self.diameter * 0.14), QFont.Weight.Bold)
+        painter.setFont(font_val)
+        
+        # Rectangle de dessin du chiffre
+        val_rect = QRect(-100, y_base - 40, 200, 60)
+        painter.drawText(val_rect, Qt.AlignCenter, f"{abs(self.value):.0f}")
+        
+        # 2. UNITÉ (Réduite à 4% et passée en gris plus sombre pour le contraste)
+        font_unit = QFont("Orbitron", int(self.diameter * 0.04), QFont.Weight.Normal)
+        painter.setFont(font_unit)
+        painter.setPen(QColor(140, 140, 140)) # Gris plus discret
+        
+        # On augmente l'écart : positionnée 35 pixels sous la base du chiffre
+        unit_rect = QRect(-100, y_base + 30, 200, 30)
+        painter.drawText(unit_rect, Qt.AlignCenter, self.units)
+        painter.restore()
+
+    def draw_scale_markers(self, painter):
+        """Graduations encore plus discrètes pour ne pas polluer le regard"""
+        painter.save()
+        painter.setPen(QColor(100, 100, 100)) # Gris plus sombre
+        painter.setFont(QFont("Orbitron", 7)) # Plus petit
+        radius = self.diameter / 2 - 45 # On les éloigne encore un peu du bord
+        
         for i in range(self.scalaCount + 1):
-            painter.drawLine(int(self.widget_diameter/2 - 10), 0, int(self.widget_diameter/2), 0)
-            painter.rotate(steps_size)
-        painter.restore()
-
-    def create_fine_scaled_marker(self, painter):
-        painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.setPen(self.fineScaleColor)
-        painter.rotate(self.scale_angle_start_value)
-        steps_size = (float(self.scale_angle_size) / float(self.scalaCount * self.scala_subdiv_count))
-        for i in range((self.scalaCount * self.scala_subdiv_count) + 1):
-            painter.drawLine(int(self.widget_diameter/2 - 5), 0, int(self.widget_diameter/2), 0)
-            painter.rotate(steps_size)
-        painter.restore()
-
-    def create_scale_marker_values_text(self, painter):
-        painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        font = QFont("Arial", 10, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.setPen(self.ScaleValueColor)
-        
-        text_radius = self.widget_diameter/2 * 0.8
-        scale_per_div = (self.maxValue - self.minValue) / self.scalaCount
-        angle_distance = self.scale_angle_size / self.scalaCount
-        
-        for i in range(self.scalaCount + 1):
-            text = str(int(self.minValue + scale_per_div * i))
-            angle = math.radians(angle_distance * i + self.scale_angle_start_value)
-            x = text_radius * math.cos(angle)
-            y = text_radius * math.sin(angle)
-            painter.drawText(int(x - 10), int(y + 5), text)
-        painter.restore()
-
-    def create_values_text(self, painter):
-        painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.setPen(self.DisplayValueColor)
-        
-        # Valeur centrale massive
-        font_value = QFont("Arial", int(self.widget_diameter * 0.15), QFont.Weight.Bold)
-        painter.setFont(font_value)
-        painter.drawText(QRect(int(-self.width()/2), -20, self.width(), 60), 
-                         Qt.AlignmentFlag.AlignCenter, str(int(self.value)))
-        
-        # Unités en dessous
-        font_units = QFont("Arial", int(self.widget_diameter * 0.05))
-        painter.setFont(font_units)
-        painter.drawText(QRect(int(-self.width()/2), 30, self.width(), 30), 
-                         Qt.AlignmentFlag.AlignCenter, self.units)
+            val = self.minValue + (i * (self.maxValue - self.minValue) / self.scalaCount)
+            angle = math.radians(self.scale_angle_start_value + (i * self.scale_angle_size / self.scalaCount))
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+            painter.drawText(QRect(int(x)-20, int(y)-10, 40, 20), Qt.AlignCenter, f"{val:.0f}")
         painter.restore()
 
     def draw_needle(self, painter):
         painter.save()
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(self.NeedleColor)
-        
-        # Rotation de l'aiguille selon la valeur actuelle
-        angle = ((self.value - self.minValue) * self.scale_angle_size / 
-                 (self.maxValue - self.minValue)) + self.scale_angle_start_value
-        painter.rotate(angle + 90)
-        painter.drawConvexPolygon(self.value_needle[0])
+        ratio = (self.value - self.minValue) / (self.maxValue - self.minValue)
+        angle = self.scale_angle_start_value + (ratio * self.scale_angle_size)
+        painter.rotate(angle)
+        painter.setPen(Qt.NoPen)
+        # Aiguille blanche pour ressortir sur les couleurs
+        painter.setBrush(QColor(255, 255, 255))
+        needle = QPolygon([QPoint(int(self.diameter/2 - 15), 0), QPoint(0, 3), QPoint(0, -3)])
+        painter.drawConvexPolygon(needle)
         painter.restore()
