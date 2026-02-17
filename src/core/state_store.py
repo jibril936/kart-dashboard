@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QObject, pyqtSignal
+from qtpy.QtCore import QObject, Signal
 
 class StateStore(QObject):
     """Central state and signal hub for ALL BMS and Vehicle data."""
@@ -9,36 +9,36 @@ class StateStore(QObject):
         # getattr permet d'éviter le crash si 'soc' n'est pas encore créé
         return getattr(self, 'soc', 0)
     # --- VEHICLE ---
-    speed_changed = pyqtSignal(float)
-    steer_angle_changed = pyqtSignal(float)
-    brake_status = pyqtSignal(bool)
-    motor_temp_changed = pyqtSignal(float)
+    speed_changed = Signal(float)
+    steer_angle_changed = Signal(float)
+    brake_status = Signal(bool)
+    motor_temp_changed = Signal(float)
 
     # --- BMS GLOBAL ---
-    soc_changed = pyqtSignal(int)
-    pack_voltage_changed = pyqtSignal(float)
-    pack_current_changed = pyqtSignal(float)
-    power_changed = pyqtSignal(float)  # Watts
-    capacity_remaining_ah = pyqtSignal(float)
-    cycle_count = pyqtSignal(int)
+    soc_changed = Signal(int)
+    pack_voltage_changed = Signal(float)
+    pack_current_changed = Signal(float)
+    power_changed = Signal(float)  # Watts
+    capacity_remaining_ah = Signal(float)
+    cycle_count = Signal(int)
 
     # --- BMS CELLS ---
-    cell_voltages_changed = pyqtSignal(list) # Liste des 16-24 tensions
-    cell_min_v = pyqtSignal(float)
-    cell_max_v = pyqtSignal(float)
-    cell_delta_v = pyqtSignal(float)
+    cell_voltages_changed = Signal(list) # Liste des 16-24 tensions
+    cell_min_v = Signal(float)
+    cell_max_v = Signal(float)
+    cell_delta_v = Signal(float)
 
     # --- BMS TEMPERATURES ---
-    batt_temp_changed = pyqtSignal(float)
-    temp_mosfet = pyqtSignal(float)
-    temp_sensor_1 = pyqtSignal(float)
-    temp_sensor_2 = pyqtSignal(float)
+    batt_temp_changed = Signal(float)
+    temp_mosfet = Signal(float)
+    temp_sensor_1 = Signal(float)
+    temp_sensor_2 = Signal(float)
 
     # --- BMS STATUS & ALARMS ---
     # On envoie des codes bruts ou des dictionnaires pour le tri ultérieur
-    bms_status_bitmask = pyqtSignal(int)
-    bms_alarms = pyqtSignal(list)
+    bms_status_bitmask = Signal(int)
+    bms_alarms = Signal(list)
 
     # --- SAFETY & STATION ---
-    ultrasonic_distances = pyqtSignal(list)
-    evse_data = pyqtSignal(float, float)
+    ultrasonic_distances = Signal(list)
+    evse_data = Signal(float, float)
