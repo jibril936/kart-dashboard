@@ -96,9 +96,10 @@ class HardwareService(BaseDataService):
                 t = self._parse_temp(int.from_bytes(data[offset+1:offset+3], "big"))
                 self.state_store.temp_mosfet.emit(t)
                 offset += 3
-            elif marker == 0x81: # T1
+            elif marker == 0x81: # T1 (On décide que c'est la batterie)
                 t = self._parse_temp(int.from_bytes(data[offset+1:offset+3], "big"))
                 self.state_store.temp_sensor_1.emit(t)
+                self.state_store.batt_temp_changed.emit(t) # <--- AJOUTE CETTE LIGNE
                 offset += 3
             elif marker == 0x82: # T2
                 t = self._parse_temp(int.from_bytes(data[offset+1:offset+3], "big"))
