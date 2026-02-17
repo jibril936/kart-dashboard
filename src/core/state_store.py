@@ -29,6 +29,7 @@ class StateStore(QObject):
     cell_delta_v = pyqtSignal(float)
 
     # --- BMS TEMPERATURES ---
+    batt_temp_changed = pyqtSignal(float)
     temp_mosfet = pyqtSignal(float)
     temp_sensor_1 = pyqtSignal(float)
     temp_sensor_2 = pyqtSignal(float)

@@ -8,6 +8,7 @@ class ExpertPage(QWidget): # <--- Le nom doit être EXACTEMENT celui-là
         self.store = store
         self.cells = []
         self.setup_ui()
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.connect_signals()
 
     def setup_ui(self):
