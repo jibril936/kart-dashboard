@@ -10,33 +10,28 @@ from src.core.mock_service import MockService
 from src.core.hardware_service import HardwareService
 
 def main() -> int:
-    # 1. Gestion des paramètres de lancement
     parser = argparse.ArgumentParser(description="Kart Dashboard V3")
-    parser.add_argument("--fs", "--fullscreen", action="store_true", help="Lance en plein écran")
+    parser.add_argument("--fs", "--fullscreen", action="store_true", help="Mode plein écran")
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
 
-    # 2. Gestion du curseur : on le cache uniquement en plein écran
+    # Cache le curseur si on est en plein écran
     if args.fs:
         app.setOverrideCursor(Qt.CursorShape.BlankCursor)
 
     state_store = StateStore()
 
-    # 3. Services
     simu_service = MockService(state_store)
     bms_service = HardwareService(state_store)
-
-    # 4. Interface
     window = MainWindow(state_store)
     
     if args.fs:
         window.showFullScreen()
     else:
-        window.resize(1024, 600) # Taille standard pour le dev
+        window.resize(1024, 600)
         window.show()
 
-    # --- Lancement des moteurs ---
     simu_service.start()
     bms_service.start()
 
