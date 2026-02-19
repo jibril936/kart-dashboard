@@ -12,13 +12,18 @@ DEFAULT_BAUD = 115200
 
 
 class HardwareService(BaseDataService):
-    def __init__(
-        self,
-        state_store,
-        port: str,
-        baud: int = DEFAULT_BAUD,
-        parent=None,
-    ) -> None:
+    """
+    BMS JK via RS485 (USB-Série)
+    - SILENCE TOTAL: aucun print()
+    - Décode 0x89 (capacité restante)
+    - Utilise UNIQUEMENT les setters du StateStore
+    """
+
+    # Bits MOSFET (placeholder -> ajuste selon ta table JK si besoin)
+    CHARGE_MOSFET_MASK = 0x0001
+    DISCHARGE_MOSFET_MASK = 0x0002
+
+    def __init__(self, state_store, port: str, baud: int = DEFAULT_BAUD, parent=None) -> None:
         super().__init__(state_store, parent=parent)
         self.port = port
         self.baud = int(baud)
@@ -26,39 +31,37 @@ class HardwareService(BaseDataService):
     def run(self) -> None:
         self._running = True
 
-        if not self.port:
-            print("❌ [BMS] Port série vide. Lance avec: python main.py --port /dev/ttyUSB0")
-            return
-
-        print(f"✅ [BMS] Démarrage Scan Intégral sur {self.port} @ {self.baud}")
-
         try:
             with serial.Serial(self.port, self.baud, timeout=1.0) as ser:
                 while self._running:
-                    req = self._build_jk_request()
+                    try:
+                        req = self._build_jk_request()
 
-                    ser.reset_input_buffer()
-                    ser.write(req)
-                    ser.flush()
+                        ser.reset_input_buffer()
+                        ser.write(req)
+                        ser.flush()
 
-                    time.sleep(0.15)
+                        time.sleep(0.15)
 
-                    frame = self._read_jk_frame(ser)
-                    if frame:
-                        self._decode_all_jk_data(frame)
+                        frame = self._read_jk_frame(ser)
+                        if frame:
+                            self._decode_all_jk_data(frame)
 
-                    time.sleep(0.4)
+                        time.sleep(0.4)
 
-        except Exception as e:
-            print(f"❌ [BMS] Erreur : {e}")
+                    except Exception:
+                        # Silence total: pas de print.
+                        continue
+
+        except Exception:
+            # Silence total: pas de print.
+            return
 
     def _build_jk_request(self) -> bytes:
         stx = b"\x4E\x57"
         body = b"\x00\x00\x00\x00\x06\x03\x00\x00\x00\x00\x00\x00\x68"
-
-        length_val = 2 + len(body) + 4  # (len field + body + chk + end bytes)
+        length_val = 2 + len(body) + 4  # len-field + body + chk + tail
         frame_wo_chk = stx + length_val.to_bytes(2, "big") + body
-
         chk = sum(frame_wo_chk) & 0xFFFF
         return frame_wo_chk + b"\x00\x00" + chk.to_bytes(2, "big")
 
@@ -70,7 +73,6 @@ class HardwareService(BaseDataService):
             b = ser.read(1)
             if not b:
                 continue
-
             buf += b
             if len(buf) >= 2 and buf[-2:] == b"\x4E\x57":
                 break
@@ -82,6 +84,9 @@ class HardwareService(BaseDataService):
             return None
 
         length = int.from_bytes(ln_data, "big")
+        if length < 2:
+            return None
+
         rest = ser.read(length - 2)
         if len(rest) < (length - 2):
             return None
@@ -89,16 +94,16 @@ class HardwareService(BaseDataService):
         return bytes(b"\x4E\x57" + ln_data + rest)
 
     def _decode_all_jk_data(self, frame: bytes) -> None:
-        # Données JK : frame[11:-5] d'après ton implémentation actuelle
+        # Format selon ton implémentation existante: data=frame[11:-5]
         data = frame[11:-5]
         offset = 0
 
-        voltages: list[float] = []
+        cell_voltages: list[float] = []
 
         while offset < len(data):
             marker = data[offset]
 
-            # --- BLOC CELLULES (0x79) ---
+            # 0x79: cellules (block)
             if marker == 0x79:
                 if offset + 2 >= len(data):
                     break
@@ -108,18 +113,17 @@ class HardwareService(BaseDataService):
                     break
 
                 cell_bytes = data[offset + 2 : end]
-
-                # Format observé : [cell_id][V_hi][V_lo] répété
+                # pattern: [cell_id][V_hi][V_lo] * N
                 for i in range(0, len(cell_bytes), 3):
                     if i + 2 >= len(cell_bytes):
                         break
                     v = ((cell_bytes[i + 1] << 8) | cell_bytes[i + 2]) / 1000.0
-                    voltages.append(v)
+                    cell_voltages.append(v)
 
                 offset = end
                 continue
 
-            # --- TOTAL VOLTAGE (0x83) ---
+            # 0x83: pack voltage (0.01 V)
             if marker == 0x83:
                 if offset + 3 > len(data):
                     break
@@ -128,19 +132,19 @@ class HardwareService(BaseDataService):
                 offset += 3
                 continue
 
-            # --- CURRENT (0x84) ---
+            # 0x84: current (0.01 A signed)
             if marker == 0x84:
                 if offset + 3 > len(data):
                     break
                 c_raw = int.from_bytes(data[offset + 1 : offset + 3], "big")
-                current = (c_raw & 0x7FFF) * 0.01
+                amps = (c_raw & 0x7FFF) * 0.01
                 if not (c_raw & 0x8000):
-                    current = -current
-                self.state_store.set_pack_current(current)
+                    amps = -amps
+                self.state_store.set_pack_current(amps)
                 offset += 3
                 continue
 
-            # --- SOC (0x85) ---
+            # 0x85: SOC %
             if marker == 0x85:
                 if offset + 2 > len(data):
                     break
@@ -148,35 +152,16 @@ class HardwareService(BaseDataService):
                 offset += 2
                 continue
 
-            # --- TEMP MOSFET (0x80) ---
-            if marker == 0x80:
-                if offset + 3 > len(data):
-                    break
-                t = self._parse_temp(int.from_bytes(data[offset + 1 : offset + 3], "big"))
-                self.state_store.set_temp_mosfet(t)
-                offset += 3
-                continue
-
-            # --- TEMP SENSOR 1 (0x81) => Batterie ---
+            # 0x81: temp sensor 1 (batt)
             if marker == 0x81:
                 if offset + 3 > len(data):
                     break
                 t = self._parse_temp(int.from_bytes(data[offset + 1 : offset + 3], "big"))
-                self.state_store.set_temp_sensor_1(t)
                 self.state_store.set_batt_temp(t)
                 offset += 3
                 continue
 
-            # --- TEMP SENSOR 2 (0x82) ---
-            if marker == 0x82:
-                if offset + 3 > len(data):
-                    break
-                t = self._parse_temp(int.from_bytes(data[offset + 1 : offset + 3], "big"))
-                self.state_store.set_temp_sensor_2(t)
-                offset += 3
-                continue
-
-            # --- CYCLE COUNT (0x87) ---
+            # 0x87: cycle count
             if marker == 0x87:
                 if offset + 3 > len(data):
                     break
@@ -185,7 +170,7 @@ class HardwareService(BaseDataService):
                 offset += 3
                 continue
 
-            # --- CAPACITÉ RESTANTE (0x89) ---
+            # 0x89: remaining capacity (Ah) => *0.001
             if marker == 0x89:
                 if offset + 5 > len(data):
                     break
@@ -194,40 +179,35 @@ class HardwareService(BaseDataService):
                 offset += 5
                 continue
 
-            # --- STATUS (0x8B) ---
+            # 0x8B: status bitmask (16-bit) + MOSFET derivation
             if marker == 0x8B:
                 if offset + 3 > len(data):
                     break
-                status = int.from_bytes(data[offset + 1 : offset + 3], "big")
+                status = int.from_bytes(data[offset + 1 : offset + 3], "big") & 0xFFFF
                 self.state_store.set_bms_status_bitmask(status)
+
+                charge_on = bool(status & self.CHARGE_MOSFET_MASK)
+                discharge_on = bool(status & self.DISCHARGE_MOSFET_MASK)
+                self.state_store.set_mosfet_status(charge_on, discharge_on)
+
                 offset += 3
                 continue
 
-            # --- ALARMS (0x90..0x96) ---
+            # alarms 0x90..0x96 (skip 2 bytes)
             if 0x90 <= marker <= 0x96:
-                # Placeholder (tu pourras raffiner plus tard)
-                # offset+1 = valeur / flags etc. selon protocole
                 if offset + 2 > len(data):
                     break
                 offset += 2
                 continue
 
-            # Inconnu => avance d’1
             offset += 1
 
-        # Après scan, push data cellules (source de vérité)
-        if voltages:
-            self.state_store.set_cell_data(voltages)
-            v_min, v_max = min(voltages), max(voltages)
-            print(
-                f"✅ [BMS] {len(voltages)} cells | "
-                f"V_max: {v_max:.3f}V | V_min: {v_min:.3f}V | Δ: {(v_max - v_min):.3f}V"
-            )
+        if cell_voltages:
+            self.state_store.set_cell_voltages(cell_voltages)
 
-    def _parse_temp(self, val: int) -> float:
-        """
-        Décodage température JK BMS (d'après ta logique actuelle).
-        """
+    @staticmethod
+    def _parse_temp(val: int) -> float:
+        # Conservé (logique existante): >100 => négatif
         if val > 100:
             return float(-(val - 100))
         return float(val)

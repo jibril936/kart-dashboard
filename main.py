@@ -12,7 +12,7 @@ from src.main_window import MainWindow
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kart Dashboard V3")
+    parser = argparse.ArgumentParser(description="Kart Dashboard (Raspberry Pi / PyQt6 / QtPy)")
     parser.add_argument("--fs", "--fullscreen", action="store_true", help="Mode plein écran")
     parser.add_argument(
         "--port",
@@ -24,28 +24,27 @@ def main() -> int:
 
     app = QApplication(sys.argv)
 
-    # Cache le curseur si on est en plein écran
     if args.fs:
         app.setOverrideCursor(Qt.CursorShape.BlankCursor)
 
-    state_store = StateStore()
+    store = StateStore()
 
-    simu_service = MockService(state_store)
-    bms_service = HardwareService(state_store, port=args.port)
+    mock_service = MockService(store)
+    bms_service = HardwareService(store, port=args.port)
 
-    window = MainWindow(state_store)
+    window = MainWindow(store)
     if args.fs:
         window.showFullScreen()
     else:
         window.resize(1024, 600)
         window.show()
 
-    simu_service.start()
+    mock_service.start()
     bms_service.start()
 
     def shutdown(*_sig_args):
         try:
-            simu_service.stop()
+            mock_service.stop()
         except Exception:
             pass
         try:
