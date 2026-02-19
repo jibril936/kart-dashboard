@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from qtpy.QtCore import Qt, Slot
+from qtpy.QtCore import Qt, Slot, QEvent
 from qtpy.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -15,53 +15,53 @@ from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
 class Lamp(QFrame):
-    """Voyant compact ON/OFF."""
+    """Voyant ultra-compact ON/OFF (optimisé 800x480)."""
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self._on = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(50)
-        self.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:14px; }")
+        self.setFixedHeight(34)
+        self.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:12px; }")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
 
         self.dot = QLabel("●")
-        self.dot.setStyleSheet("color:#222; font-size:18px;")
+        self.dot.setStyleSheet("color:#222; font-size:14px;")
         layout.addWidget(self.dot)
 
         self.lbl_title = QLabel(title)
-        self.lbl_title.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:11px;")
+        self.lbl_title.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
         layout.addWidget(self.lbl_title)
 
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedWidth(56)
+        self.badge.setFixedSize(44, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setStyleSheet(
             "background:#111; border:1px solid #222; border-radius:10px; "
-            "color:#666; font-family:Orbitron; font-weight:bold; font-size:10px;"
+            "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
         )
         layout.addWidget(self.badge)
 
     def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
         self._on = bool(state)
         if self._on:
-            self.dot.setStyleSheet(f"color:{color_on}; font-size:18px;")
+            self.dot.setStyleSheet(f"color:{color_on}; font-size:14px;")
             self.badge.setText("ON")
             self.badge.setStyleSheet(
                 f"background:{color_on}; border:none; border-radius:10px; "
-                "color:#000; font-family:Orbitron; font-weight:bold; font-size:10px;"
+                "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
         else:
-            self.dot.setStyleSheet("color:#222; font-size:18px;")
+            self.dot.setStyleSheet("color:#222; font-size:14px;")
             self.badge.setText("OFF")
             self.badge.setStyleSheet(
                 "background:#111; border:1px solid #222; border-radius:10px; "
-                "color:#666; font-family:Orbitron; font-weight:bold; font-size:10px;"
+                "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
 
 
@@ -75,13 +75,12 @@ class ExpertPage(QWidget):
     """
     Expert page:
       - Carte "BMS HEALTH" cliquable
-      - Overlay plein écran "FULL BMS CONTROL" (resizeEvent)
-          * Grille 4x4 BatteryIcons
-          * MOSFET STATUS (Charge/Décharge)
-          * BMS DIAGNOSTIC (OV/OT/SC) basé sur bitmask
+      - Overlay plein écran "FULL BMS CONTROL"
+        Optimisé pour 800x480: compaction verticale + lisibilité.
+      - Overlay posé sur self.window() pour couvrir toute l'UI.
     """
 
-    # Bits diagnostics (placeholder -> ajuste si ta table JK diffère)
+    # Bits diagnostics (placeholder -> ajuste si table JK diffère)
     BIT_OV = 0x0004
     BIT_OT = 0x0008
     BIT_SC = 0x0010
@@ -94,10 +93,19 @@ class ExpertPage(QWidget):
         self.setStyleSheet("background-color: black;")
 
         self._vpack = 0.0
+        self._current = 0.0
+        self._power_kw = 0.0
+
         self._vmin = 0.0
         self._vmax = 0.0
         self._delta = 0.0
-        self._bitmask = 0
+
+        self._t1 = 0.0
+        self._t2 = 0.0
+        self._tmos = 0.0
+
+        self._overlay_host = None
+        self._host_filter_installed = False
 
         self._build_main()
         self._build_overlay()
@@ -118,7 +126,6 @@ class ExpertPage(QWidget):
         self.card.clicked.connect(self.show_overlay)
         row.addWidget(self.card)
 
-        # placeholder à droite (tu peux mettre d’autres cards)
         spacer = QFrame(self)
         spacer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         spacer.setStyleSheet("QFrame { background:#060606; border:1px dashed #222; border-radius:16px; }")
@@ -137,57 +144,57 @@ class ExpertPage(QWidget):
         self.overlay.setStyleSheet("QFrame { background-color: rgba(0, 0, 0, 250); border:none; }")
 
         root = QVBoxLayout(self.overlay)
-        root.setContentsMargins(18, 14, 18, 14)
-        root.setSpacing(14)
+        root.setContentsMargins(8, 6, 8, 6)
+        root.setSpacing(6)
 
-        # Header (fixe)
+        # Header (très compact)
         header = QFrame(self.overlay)
-        header.setFixedHeight(58)
+        header.setFixedHeight(34)
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        header.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:14px; }")
+        header.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:12px; }")
 
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(14, 10, 14, 10)
-        hl.setSpacing(10)
+        hl.setContentsMargins(10, 4, 10, 4)
+        hl.setSpacing(8)
 
         title = QLabel("FULL BMS CONTROL")
-        title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 18px; font-weight: bold;")
+        title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 12px; font-weight: bold;")
         hl.addWidget(title)
 
         hl.addStretch(1)
 
         self.btn_close = QPushButton("CLOSE")
-        self.btn_close.setFixedSize(110, 40)
+        self.btn_close.setFixedSize(78, 24)
         self.btn_close.setStyleSheet(
-            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:12px; "
-            "font-family:Orbitron; font-weight:bold; }"
+            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
+            "font-family:Orbitron; font-weight:bold; font-size:9px; }"
             "QPushButton:pressed { background:#00FFD0; color:#000; border:none; }"
         )
-        self.btn_close.clicked.connect(self.overlay.hide)
+        self.btn_close.clicked.connect(self.hide_overlay)
         hl.addWidget(self.btn_close)
 
         root.addWidget(header)
 
-        # Content row: grid left + panels right
         content = QHBoxLayout()
-        content.setSpacing(16)
+        content.setSpacing(8)
 
-        # Cells grid (4x4)
+        # Cells grid
         grid_wrap = QFrame(self.overlay)
         grid_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        grid_wrap.setStyleSheet("QFrame { background:#050505; border:1px solid #222; border-radius:16px; }")
-        grid_layout = QVBoxLayout(grid_wrap)
-        grid_layout.setContentsMargins(14, 14, 14, 14)
-        grid_layout.setSpacing(10)
+        grid_wrap.setStyleSheet("QFrame { background:#050505; border:1px solid #222; border-radius:14px; }")
 
-        lbl_cells = QLabel("CELLS (4x4)")
-        lbl_cells.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:11px;")
+        grid_layout = QVBoxLayout(grid_wrap)
+        grid_layout.setContentsMargins(10, 8, 10, 8)
+        grid_layout.setSpacing(4)
+
+        lbl_cells = QLabel("CELLS")
+        lbl_cells.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:10px;")
         grid_layout.addWidget(lbl_cells)
 
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(14)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
 
         self.cell_widgets = []
         for i in range(16):
@@ -198,75 +205,130 @@ class ExpertPage(QWidget):
         grid_layout.addLayout(grid, 1)
         content.addWidget(grid_wrap, 1)
 
-        # Right panels
+        # Right column
         right = QVBoxLayout()
-        right.setSpacing(16)
+        right.setSpacing(6)
 
-        # MOSFET STATUS panel
-        mos_panel = QFrame(self.overlay)
-        mos_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        mos_panel.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:16px; }")
-        mos_l = QVBoxLayout(mos_panel)
-        mos_l.setContentsMargins(14, 14, 14, 14)
-        mos_l.setSpacing(10)
+        def make_panel(title_text: str) -> tuple[QFrame, QVBoxLayout]:
+            panel = QFrame(self.overlay)
+            panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            panel.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:14px; }")
+            v = QVBoxLayout(panel)
+            v.setContentsMargins(10, 8, 10, 8)
+            v.setSpacing(4)
+            t = QLabel(title_text)
+            t.setStyleSheet("color: cyan; font-family:Orbitron; font-size:10px;")
+            v.addWidget(t)
+            return panel, v
 
-        mos_title = QLabel("MOSFET STATUS")
-        mos_title.setStyleSheet("color: cyan; font-family:Orbitron; font-size:11px;")
-        mos_l.addWidget(mos_title)
-
+        # MOSFET STATUS
+        mos_panel, mos_l = make_panel("MOSFET STATUS")
         self.lamp_charge = Lamp("CHARGE")
         self.lamp_discharge = Lamp("DISCHARGE")
         mos_l.addWidget(self.lamp_charge)
         mos_l.addWidget(self.lamp_discharge)
-        mos_l.addStretch(1)
+        right.addWidget(mos_panel)
 
-        # BMS DIAGNOSTIC panel
-        diag_panel = QFrame(self.overlay)
-        diag_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        diag_panel.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:16px; }")
-        diag_l = QVBoxLayout(diag_panel)
-        diag_l.setContentsMargins(14, 14, 14, 14)
-        diag_l.setSpacing(10)
+        # REAL-TIME DATA
+        rt_panel, rt_l = make_panel("REAL-TIME DATA")
 
-        diag_title = QLabel("BMS DIAGNOSTIC")
-        diag_title.setStyleSheet("color: cyan; font-family:Orbitron; font-size:11px;")
-        diag_l.addWidget(diag_title)
+        def make_kv_row(label: str, initial: str) -> QLabel:
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(6)
+
+            k = QLabel(label)
+            k.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
+
+            v = QLabel(initial)
+            v.setMinimumWidth(70)
+            v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            v.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:10px; font-weight:bold;")
+
+            row.addWidget(k)
+            row.addStretch(1)
+            row.addWidget(v)
+            rt_l.addLayout(row)
+            return v
+
+        self.val_current = make_kv_row("Courant", "0.0 A")
+        self.val_power = make_kv_row("Puissance", "0.0 kW")
+        self.val_t1 = make_kv_row("Temp Sonde 1", "0 °C")
+        self.val_t2 = make_kv_row("Temp Sonde 2", "0 °C")
+        self.val_tmos = make_kv_row("Temp MOSFET", "0 °C")
+
+        right.addWidget(rt_panel)
+
+        # BMS DIAGNOSTIC (compact mais lisible)
+        diag_panel, diag_l = make_panel("BMS DIAGNOSTIC")
 
         self.lbl_mask = QLabel("STATUS: 0x0000")
-        self.lbl_mask.setStyleSheet("color:#DDD; font-family:Orbitron; font-size:14px; font-weight:bold;")
+        self.lbl_mask.setStyleSheet("color:#DDD; font-family:Orbitron; font-size:11px; font-weight:bold;")
         diag_l.addWidget(self.lbl_mask)
 
         self.al_ov = AlertLamp("OV (Overvoltage)")
         self.al_ot = AlertLamp("OT (Overtemp)")
         self.al_sc = AlertLamp("SC (Short-circuit)")
+
         diag_l.addWidget(self.al_ov)
         diag_l.addWidget(self.al_ot)
         diag_l.addWidget(self.al_sc)
-        diag_l.addStretch(1)
 
-        right.addWidget(mos_panel)
         right.addWidget(diag_panel)
+
+        # IMPORTANT: pas de stretch agressif qui pousse et casse la lecture
         right.addStretch(1)
 
         content.addLayout(right)
-
         root.addLayout(content, 1)
 
-    def resizeEvent(self, event):
-        # Overlay plein écran
-        if hasattr(self, "overlay"):
-            self.overlay.setGeometry(self.rect())
-        super().resizeEvent(event)
+    # -----------------
+    # Overlay sizing on window() (covers full UI)
+    # -----------------
+    def _ensure_overlay_host(self) -> None:
+        host = self.window()
+        if host is None:
+            return
+
+        if self._overlay_host is not host:
+            self._overlay_host = host
+
+        if self.overlay.parentWidget() is not host:
+            self.overlay.setParent(host)
+            self.overlay.raise_()
+
+        if not self._host_filter_installed:
+            host.installEventFilter(self)
+            self._host_filter_installed = True
+
+        self._sync_overlay_geometry()
+
+    def _sync_overlay_geometry(self) -> None:
+        if self._overlay_host is None:
+            return
+        self.overlay.setGeometry(self._overlay_host.rect())
+
+    def eventFilter(self, obj, event):
+        if obj is self._overlay_host and event.type() == QEvent.Type.Resize:
+            if self.overlay.isVisible():
+                self._sync_overlay_geometry()
+        return super().eventFilter(obj, event)
 
     def show_overlay(self) -> None:
+        self._ensure_overlay_host()
         self.overlay.show()
         self.overlay.raise_()
+
+    def hide_overlay(self) -> None:
+        self.overlay.hide()
 
     # -----------------
     # Signals
     # -----------------
     def _connect_signals(self) -> None:
         self.store.pack_voltage_changed.connect(self._on_vpack)
+        self.store.pack_current_changed.connect(self._on_current)
+
         self.store.cell_min_v.connect(self._on_vmin)
         self.store.cell_max_v.connect(self._on_vmax)
         self.store.cell_delta_v.connect(self._on_delta)
@@ -275,10 +337,28 @@ class ExpertPage(QWidget):
         self.store.mosfet_status_changed.connect(self._on_mosfets)
         self.store.bms_status_bitmask.connect(self._on_bitmask)
 
+        if hasattr(self.store, "temp_sensor_1_changed"):
+            self.store.temp_sensor_1_changed.connect(self._on_t1)
+        if hasattr(self.store, "temp_sensor_2_changed"):
+            self.store.temp_sensor_2_changed.connect(self._on_t2)
+        if hasattr(self.store, "temp_mosfet_changed"):
+            self.store.temp_mosfet_changed.connect(self._on_tmos)
+
     @Slot(float)
     def _on_vpack(self, v: float):
         self._vpack = float(v)
+        self._recalc_power()
         self._refresh_card()
+
+    @Slot(float)
+    def _on_current(self, a: float):
+        self._current = float(a)
+        self._recalc_power()
+
+    def _recalc_power(self):
+        self._power_kw = (self._vpack * self._current) / 1000.0
+        self.val_current.setText(f"{self._current:.1f} A")
+        self.val_power.setText(f"{self._power_kw:.1f} kW")
 
     @Slot(float)
     def _on_vmin(self, v: float):
@@ -308,12 +388,27 @@ class ExpertPage(QWidget):
 
     @Slot(int)
     def _on_bitmask(self, mask: int):
-        self._bitmask = int(mask) & 0xFFFF
-        self.lbl_mask.setText(f"STATUS: 0x{self._bitmask:04X}")
+        bm = int(mask) & 0xFFFF
+        self.lbl_mask.setText(f"STATUS: 0x{bm:04X}")
 
-        self.al_ov.set_alert(bool(self._bitmask & self.BIT_OV))
-        self.al_ot.set_alert(bool(self._bitmask & self.BIT_OT))
-        self.al_sc.set_alert(bool(self._bitmask & self.BIT_SC))
+        self.al_ov.set_alert(bool(bm & self.BIT_OV))
+        self.al_ot.set_alert(bool(bm & self.BIT_OT))
+        self.al_sc.set_alert(bool(bm & self.BIT_SC))
+
+    @Slot(float)
+    def _on_t1(self, t: float):
+        self._t1 = float(t)
+        self.val_t1.setText(f"{self._t1:.0f} °C")
+
+    @Slot(float)
+    def _on_t2(self, t: float):
+        self._t2 = float(t)
+        self.val_t2.setText(f"{self._t2:.0f} °C")
+
+    @Slot(float)
+    def _on_tmos(self, t: float):
+        self._tmos = float(t)
+        self.val_tmos.setText(f"{self._tmos:.0f} °C")
 
     def _refresh_card(self) -> None:
         self.card.update_data(self._vpack, self._delta, self._vmin, self._vmax)

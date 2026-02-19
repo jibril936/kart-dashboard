@@ -16,8 +16,8 @@ class CellStats:
 class StateStore(QObject):
     """
     SOURCE DE VÉRITÉ
-    - Stockage interne systématique
-    - Setters: update valeur -> emit signal
+    - Toutes les valeurs sont stockées en interne
+    - Setters = update valeur -> emit signal
     """
 
     # -----------------
@@ -38,8 +38,13 @@ class StateStore(QObject):
     pack_voltage_changed = Signal(float)
     pack_current_changed = Signal(float)
 
-    # DEMANDÉS (tech JK)
+    # Températures BMS (REAL-TIME DATA)
     batt_temp_changed = Signal(float)
+    temp_mosfet_changed = Signal(float)
+    temp_sensor_1_changed = Signal(float)
+    temp_sensor_2_changed = Signal(float)
+
+    # Tech JK
     capacity_remaining_ah = Signal(float)
     cycle_count = Signal(int)
     bms_status_bitmask = Signal(int)
@@ -51,7 +56,7 @@ class StateStore(QObject):
     cell_max_v = Signal(float)
     cell_delta_v = Signal(float)
 
-    # Optionnel (UI)
+    # Optionnel
     bms_alarm = Signal(str)
 
     def __init__(self) -> None:
@@ -75,6 +80,10 @@ class StateStore(QObject):
         self._pack_current: float = 0.0
 
         self._batt_temp: float = 0.0
+        self._temp_mosfet: float = 0.0
+        self._temp_sensor_1: float = 0.0
+        self._temp_sensor_2: float = 0.0
+
         self._capacity_remaining_ah: float = 0.0
         self._cycle_count: int = 0
         self._bms_status_bitmask: int = 0
@@ -102,18 +111,12 @@ class StateStore(QObject):
         self._speed = v
         self.speed_changed.emit(v)
 
-    def get_speed(self) -> float:
-        return self._speed
-
     def set_motor_temp(self, val: float) -> None:
         v = float(val)
         if self._same_float(v, self._motor_temp, eps=1e-2):
             return
         self._motor_temp = v
         self.motor_temp_changed.emit(v)
-
-    def get_motor_temp(self) -> float:
-        return self._motor_temp
 
     def set_system_ready(self, val: bool) -> None:
         v = bool(val)
@@ -122,9 +125,6 @@ class StateStore(QObject):
         self._system_ready = v
         self.system_ready.emit(v)
 
-    def get_system_ready(self) -> bool:
-        return self._system_ready
-
     def set_brake_active(self, val: bool) -> None:
         v = bool(val)
         if v == self._brake_active:
@@ -132,18 +132,12 @@ class StateStore(QObject):
         self._brake_active = v
         self.brake_active.emit(v)
 
-    def get_brake_active(self) -> bool:
-        return self._brake_active
-
     def set_is_limiting(self, val: bool) -> None:
         v = bool(val)
         if v == self._is_limiting:
             return
         self._is_limiting = v
         self.is_limiting.emit(v)
-
-    def get_is_limiting(self) -> bool:
-        return self._is_limiting
 
     # -----------------
     # BMS setters
@@ -156,9 +150,6 @@ class StateStore(QObject):
         self._soc = v
         self.soc_changed.emit(v)
 
-    def get_soc(self) -> int:
-        return self._soc
-
     def set_pack_voltage(self, val: float) -> None:
         v = float(val)
         if self._same_float(v, self._pack_voltage, eps=1e-3):
@@ -168,9 +159,6 @@ class StateStore(QObject):
 
     def set_voltage(self, val: float) -> None:
         self.set_pack_voltage(val)
-
-    def get_pack_voltage(self) -> float:
-        return self._pack_voltage
 
     def set_pack_current(self, val: float) -> None:
         v = float(val)
@@ -182,9 +170,6 @@ class StateStore(QObject):
     def set_current(self, val: float) -> None:
         self.set_pack_current(val)
 
-    def get_pack_current(self) -> float:
-        return self._pack_current
-
     def set_batt_temp(self, val: float) -> None:
         v = float(val)
         if self._same_float(v, self._batt_temp, eps=1e-2):
@@ -192,8 +177,26 @@ class StateStore(QObject):
         self._batt_temp = v
         self.batt_temp_changed.emit(v)
 
-    def get_batt_temp(self) -> float:
-        return self._batt_temp
+    def set_temp_mosfet(self, val: float) -> None:
+        v = float(val)
+        if self._same_float(v, self._temp_mosfet, eps=1e-2):
+            return
+        self._temp_mosfet = v
+        self.temp_mosfet_changed.emit(v)
+
+    def set_temp_sensor_1(self, val: float) -> None:
+        v = float(val)
+        if self._same_float(v, self._temp_sensor_1, eps=1e-2):
+            return
+        self._temp_sensor_1 = v
+        self.temp_sensor_1_changed.emit(v)
+
+    def set_temp_sensor_2(self, val: float) -> None:
+        v = float(val)
+        if self._same_float(v, self._temp_sensor_2, eps=1e-2):
+            return
+        self._temp_sensor_2 = v
+        self.temp_sensor_2_changed.emit(v)
 
     def set_capacity_remaining_ah(self, val: float) -> None:
         v = float(val)
@@ -202,9 +205,6 @@ class StateStore(QObject):
         self._capacity_remaining_ah = v
         self.capacity_remaining_ah.emit(v)
 
-    def get_capacity_remaining_ah(self) -> float:
-        return self._capacity_remaining_ah
-
     def set_cycle_count(self, val: int) -> None:
         v = int(val)
         if v == self._cycle_count:
@@ -212,18 +212,12 @@ class StateStore(QObject):
         self._cycle_count = v
         self.cycle_count.emit(v)
 
-    def get_cycle_count(self) -> int:
-        return self._cycle_count
-
     def set_bms_status_bitmask(self, val: int) -> None:
         v = int(val) & 0xFFFF
         if v == self._bms_status_bitmask:
             return
         self._bms_status_bitmask = v
         self.bms_status_bitmask.emit(v)
-
-    def get_bms_status_bitmask(self) -> int:
-        return self._bms_status_bitmask
 
     def set_mosfet_status(self, charge_on: bool, discharge_on: bool) -> None:
         c = bool(charge_on)
@@ -233,9 +227,6 @@ class StateStore(QObject):
         self._charge_mosfet_on = c
         self._discharge_mosfet_on = d
         self.mosfet_status_changed.emit(c, d)
-
-    def get_mosfet_status(self) -> tuple[bool, bool]:
-        return self._charge_mosfet_on, self._discharge_mosfet_on
 
     # -----------------
     # Cellules setters
@@ -259,12 +250,6 @@ class StateStore(QObject):
 
     def set_cell_data(self, voltages: list, v_min: float = 0.0, v_max: float = 0.0, delta: float = 0.0) -> None:
         self.set_cell_voltages(list(voltages))
-
-    def get_cell_voltages(self) -> List[float]:
-        return list(self._cell_voltages)
-
-    def get_cell_stats(self) -> CellStats:
-        return self._cell_stats
 
     # -----------------
     # Diagnostics
