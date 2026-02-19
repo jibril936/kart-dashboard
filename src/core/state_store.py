@@ -16,8 +16,8 @@ class CellStats:
 class StateStore(QObject):
     """
     SOURCE DE VÉRITÉ
-    - Toutes les valeurs sont stockées en interne
-    - Setters = update valeur -> emit signal
+    - Stockage interne systématique
+    - Setters: update valeur -> emit signal
     """
 
     # -----------------
@@ -38,17 +38,17 @@ class StateStore(QObject):
     pack_voltage_changed = Signal(float)
     pack_current_changed = Signal(float)
 
-    # Températures BMS (REAL-TIME DATA)
-    batt_temp_changed = Signal(float)
-    temp_mosfet_changed = Signal(float)
-    temp_sensor_1_changed = Signal(float)
-    temp_sensor_2_changed = Signal(float)
+    # Températures BMS (overlay)
+    batt_temp_changed = Signal(float)          # Batterie (on mappe sur 0x82)
+    temp_mosfet_changed = Signal(float)        # MOS/power tube (0x80)
+    temp_sensor_1_changed = Signal(float)      # Battery box (0x81)
+    temp_sensor_2_changed = Signal(float)      # Batterie (0x82)
 
     # Tech JK
     capacity_remaining_ah = Signal(float)
     cycle_count = Signal(int)
-    bms_status_bitmask = Signal(int)
-    mosfet_status_changed = Signal(bool, bool)  # (charge_on, discharge_on)
+    bms_status_bitmask = Signal(int)           # 0x8B warning bitmask
+    mosfet_status_changed = Signal(bool, bool) # (charge_on, discharge_on) from 0x8C
 
     # Cellules (overlay)
     cell_voltages_changed = Signal(list)
@@ -56,7 +56,7 @@ class StateStore(QObject):
     cell_max_v = Signal(float)
     cell_delta_v = Signal(float)
 
-    # Optionnel
+    # Optionnel (UI)
     bms_alarm = Signal(str)
 
     def __init__(self) -> None:
@@ -94,9 +94,6 @@ class StateStore(QObject):
         self._cell_voltages: List[float] = []
         self._cell_stats: CellStats = CellStats(0.0, 0.0, 0.0)
 
-    # -----------------
-    # Helpers
-    # -----------------
     @staticmethod
     def _same_float(a: float, b: float, eps: float = 1e-4) -> bool:
         return abs(a - b) <= eps
@@ -143,8 +140,7 @@ class StateStore(QObject):
     # BMS setters
     # -----------------
     def set_soc(self, val: int) -> None:
-        v = int(val)
-        v = max(0, min(100, v))
+        v = max(0, min(100, int(val)))
         if v == self._soc:
             return
         self._soc = v

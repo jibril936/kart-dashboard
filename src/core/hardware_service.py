@@ -14,29 +14,54 @@ DEFAULT_BAUD = 115200
 class HardwareService(BaseDataService):
     """
     BMS JK via RS485 (USB-Série)
+
     - SILENCE TOTAL: aucun print()
-    - Décode 0x89 (capacité restante)
     - Utilise UNIQUEMENT les setters du StateStore
+    - Protocole JK LCD (4E 57 ...), tags TLV:
+        0x79 cellules (len + 3*n)
+        0x80 temp MOS/power tube (2)
+        0x81 temp battery box (2)
+        0x82 temp battery (2)
+        0x83 Vpack (2) *0.01
+        0x84 courant (2) -> encodage variable selon firmware
+        0x85 SOC (1)
+        0x87 cycle count (2)
+        0x89 capacité restante/cycle capacity (4) *0.001 (Ah) [selon ton besoin]
+        0x8B warning bitmask (2)
+        0x8C status info bitmask (2) => MOSFET charge/discharge
     """
 
-    # Bits MOSFET (placeholder -> ajuste selon ta table JK si besoin)
-    CHARGE_MOSFET_MASK = 0x0001
-    DISCHARGE_MOSFET_MASK = 0x0002
+    # Longueurs fixes (hors 0x79 qui a son byte len)
+    TAG_LEN = {
+        0x80: 2,
+        0x81: 2,
+        0x82: 2,
+        0x83: 2,
+        0x84: 2,
+        0x85: 1,
+        0x86: 1,
+        0x87: 2,
+        0x89: 4,
+        0x8A: 2,
+        0x8B: 2,
+        0x8C: 2,
+        # on ignore le reste proprement sans casser l'alignement quand c'est possible
+        0x8E: 2,
+        0x8F: 2,
+    }
 
     def __init__(self, state_store, port: str, baud: int = DEFAULT_BAUD, parent=None) -> None:
         super().__init__(state_store, parent=parent)
-        self.port = port
+        self.port = port or DEFAULT_BMS_PORT
         self.baud = int(baud)
 
     def run(self) -> None:
         self._running = True
-
         try:
             with serial.Serial(self.port, self.baud, timeout=1.0) as ser:
                 while self._running:
                     try:
                         req = self._build_jk_request()
-
                         ser.reset_input_buffer()
                         ser.write(req)
                         ser.flush()
@@ -48,19 +73,19 @@ class HardwareService(BaseDataService):
                             self._decode_all_jk_data(frame)
 
                         time.sleep(0.4)
-
                     except Exception:
-                        # Silence total: pas de print.
+                        # Silence total
                         continue
-
         except Exception:
-            # Silence total: pas de print.
+            # Silence total
             return
 
     def _build_jk_request(self) -> bytes:
+        # Exemple protocole:
+        # 4E 57 00 13 00 00 00 00 06 03 00 00 00 00 00 00 68 00 00 CHK_HI CHK_LO
         stx = b"\x4E\x57"
         body = b"\x00\x00\x00\x00\x06\x03\x00\x00\x00\x00\x00\x00\x68"
-        length_val = 2 + len(body) + 4  # len-field + body + chk + tail
+        length_val = 2 + len(body) + 4  # len-field + body + (00 00) + chk(2)
         frame_wo_chk = stx + length_val.to_bytes(2, "big") + body
         chk = sum(frame_wo_chk) & 0xFFFF
         return frame_wo_chk + b"\x00\x00" + chk.to_bytes(2, "big")
@@ -69,6 +94,7 @@ class HardwareService(BaseDataService):
         start_time = time.time()
         buf = bytearray()
 
+        # sync on 4E 57
         while time.time() - start_time < 1.5:
             b = ser.read(1)
             if not b:
@@ -94,7 +120,7 @@ class HardwareService(BaseDataService):
         return bytes(b"\x4E\x57" + ln_data + rest)
 
     def _decode_all_jk_data(self, frame: bytes) -> None:
-        # Format selon ton implémentation existante: data=frame[11:-5]
+        # Dans l'exemple JK LCD, le 1er tag commence à l'index 11
         data = frame[11:-5]
         offset = 0
 
@@ -103,17 +129,16 @@ class HardwareService(BaseDataService):
         while offset < len(data):
             marker = data[offset]
 
-            # 0x79: cellules (block)
+            # 0x79: cellules (block len + payload)
             if marker == 0x79:
-                if offset + 2 >= len(data):
+                if offset + 2 > len(data):
                     break
                 block_len = data[offset + 1]
                 end = offset + 2 + block_len
                 if end > len(data):
                     break
 
-                cell_bytes = data[offset + 2 : end]
-                # pattern: [cell_id][V_hi][V_lo] * N
+                cell_bytes = data[offset + 2:end]
                 for i in range(0, len(cell_bytes), 3):
                     if i + 2 >= len(cell_bytes):
                         break
@@ -123,91 +148,121 @@ class HardwareService(BaseDataService):
                 offset = end
                 continue
 
-            # 0x83: pack voltage (0.01 V)
-            if marker == 0x83:
-                if offset + 3 > len(data):
+            # tags à longueur fixe
+            ln = self.TAG_LEN.get(marker)
+            if ln is None:
+                # Pour éviter de partir en vrille sur les tags "string" (B4..BA..),
+                # on s'arrête dès qu'on entre dans les zones non gérées.
+                # (Nos données utiles sont toutes < 0x8D.)
+                if marker >= 0x8D:
                     break
-                v_pack = int.from_bytes(data[offset + 1 : offset + 3], "big") * 0.01
-                self.state_store.set_pack_voltage(v_pack)
-                offset += 3
+                offset += 1
                 continue
 
-            # 0x84: current (0.01 A signed)
-            if marker == 0x84:
-                if offset + 3 > len(data):
-                    break
-                c_raw = int.from_bytes(data[offset + 1 : offset + 3], "big")
-                amps = (c_raw & 0x7FFF) * 0.01
-                if not (c_raw & 0x8000):
-                    amps = -amps
-                self.state_store.set_pack_current(amps)
-                offset += 3
-                continue
+            if offset + 1 + ln > len(data):
+                break
 
-            # 0x85: SOC %
-            if marker == 0x85:
-                if offset + 2 > len(data):
-                    break
-                self.state_store.set_soc(int(data[offset + 1]))
-                offset += 2
-                continue
-
-            # 0x81: temp sensor 1 (batt)
-            if marker == 0x81:
-                if offset + 3 > len(data):
-                    break
-                t = self._parse_temp(int.from_bytes(data[offset + 1 : offset + 3], "big"))
-                self.state_store.set_batt_temp(t)
-                offset += 3
-                continue
-
-            # 0x87: cycle count
-            if marker == 0x87:
-                if offset + 3 > len(data):
-                    break
-                cycles = int.from_bytes(data[offset + 1 : offset + 3], "big")
-                self.state_store.set_cycle_count(cycles)
-                offset += 3
-                continue
-
-            # 0x89: remaining capacity (Ah) => *0.001
-            if marker == 0x89:
-                if offset + 5 > len(data):
-                    break
-                cap = int.from_bytes(data[offset + 1 : offset + 5], "big") * 0.001
-                self.state_store.set_capacity_remaining_ah(cap)
-                offset += 5
-                continue
-
-            # 0x8B: status bitmask (16-bit) + MOSFET derivation
-            if marker == 0x8B:
-                if offset + 3 > len(data):
-                    break
-                status = int.from_bytes(data[offset + 1 : offset + 3], "big") & 0xFFFF
-                self.state_store.set_bms_status_bitmask(status)
-
-                charge_on = bool(status & self.CHARGE_MOSFET_MASK)
-                discharge_on = bool(status & self.DISCHARGE_MOSFET_MASK)
-                self.state_store.set_mosfet_status(charge_on, discharge_on)
-
-                offset += 3
-                continue
-
-            # alarms 0x90..0x96 (skip 2 bytes)
-            if 0x90 <= marker <= 0x96:
-                if offset + 2 > len(data):
-                    break
-                offset += 2
-                continue
-
-            offset += 1
+            payload = data[offset + 1: offset + 1 + ln]
+            self._handle_tag(marker, payload)
+            offset += 1 + ln
 
         if cell_voltages:
             self.state_store.set_cell_voltages(cell_voltages)
 
+    def _handle_tag(self, marker: int, payload: bytes) -> None:
+        # Temps
+        if marker == 0x80:  # power tube (MOSFET)
+            t = self._parse_temp(int.from_bytes(payload, "big"))
+            if hasattr(self.state_store, "set_temp_mosfet"):
+                self.state_store.set_temp_mosfet(t)
+            return
+
+        if marker == 0x81:  # battery box
+            t = self._parse_temp(int.from_bytes(payload, "big"))
+            if hasattr(self.state_store, "set_temp_sensor_1"):
+                self.state_store.set_temp_sensor_1(t)
+            return
+
+        if marker == 0x82:  # battery temp
+            t = self._parse_temp(int.from_bytes(payload, "big"))
+            if hasattr(self.state_store, "set_temp_sensor_2"):
+                self.state_store.set_temp_sensor_2(t)
+            # compat / UI existante
+            if hasattr(self.state_store, "set_batt_temp"):
+                self.state_store.set_batt_temp(t)
+            return
+
+        # Vpack
+        if marker == 0x83:
+            v_pack = int.from_bytes(payload, "big") * 0.01
+            self.state_store.set_pack_voltage(v_pack)
+            return
+
+        # Courant (robuste: 2 encodages possibles)
+        if marker == 0x84:
+            raw = int.from_bytes(payload, "big") & 0xFFFF
+            amps = self._decode_current(raw)
+            self.state_store.set_pack_current(amps)
+            return
+
+        # SOC
+        if marker == 0x85:
+            self.state_store.set_soc(int(payload[0]))
+            return
+
+        # Cycles
+        if marker == 0x87:
+            cycles = int.from_bytes(payload, "big")
+            self.state_store.set_cycle_count(cycles)
+            return
+
+        # Capacité restante (Ah)
+        if marker == 0x89:
+            cap = int.from_bytes(payload, "big") * 0.001
+            self.state_store.set_capacity_remaining_ah(cap)
+            return
+
+        # Warning bitmask
+        if marker == 0x8B:
+            warn = int.from_bytes(payload, "big") & 0xFFFF
+            self.state_store.set_bms_status_bitmask(warn)
+            return
+
+        # Status info => MOSFET states
+        if marker == 0x8C:
+            status = int.from_bytes(payload, "big") & 0xFFFF
+            charge_on = bool(status & 0x0001)
+            discharge_on = bool(status & 0x0002)
+            self.state_store.set_mosfet_status(charge_on, discharge_on)
+            return
+
     @staticmethod
     def _parse_temp(val: int) -> float:
-        # Conservé (logique existante): >100 => négatif
+        # 0-140 (-40..100), >100 => négatif (100 référence)
         if val > 100:
             return float(-(val - 100))
         return float(val)
+
+    @staticmethod
+    def _decode_current(raw: int) -> float:
+        """
+        Deux encodages rencontrés:
+        A) "redefined current" : bit15 = 1 charge, 0 décharge ; magnitude en 0.01A
+           - décharge 20A => 0x07D0 (2000)
+           - charge 20A   => 0x87D0 (bit15 + 2000)
+        B) "offset 10000" : 10000 = 0A
+           - décharge -10A => 11000
+           - charge  +5A   => 9500
+        """
+        # Mode A charge: bit 15 set
+        if raw & 0x8000:
+            return (raw & 0x7FFF) * 0.01
+
+        # Heuristique mode B (autour de 10000)
+        if 8000 <= raw <= 12000:
+            return (10000 - raw) * 0.01
+
+        # Mode A décharge: magnitude directe, signe négatif
+        if raw == 0:
+            return 0.0
+        return -(raw * 0.01)
