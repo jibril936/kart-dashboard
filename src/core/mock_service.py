@@ -1,10 +1,9 @@
 import time
-import random
 import math
+import random
 from qtpy.QtCore import QThread
 
 class MockService(QThread):
-    """Simulateur bridé : Il ne gère QUE la vitesse et les statuts système."""
     def __init__(self, state_store):
         super().__init__()
         self.state_store = state_store
@@ -14,23 +13,17 @@ class MockService(QThread):
         t = 0
         while self.running:
             t += 0.1
-            
-            # 1. Simulation Vitesse (On simule un kart qui roule un peu)
-            speed = 35 + 15 * math.sin(t / 5.0)
+            # Simulation Vitesse
+            speed = 40 + 20 * math.sin(t / 5.0)
+            self.state_store.speed = speed
             self.state_store.speed_changed.emit(speed)
             
-            # 2. États système (Ceux que tu n'as pas encore en Hardware)
+            # Simulation Statuts
             self.state_store.system_ready.emit(True)
             self.state_store.brake_active.emit(speed < 32)
             self.state_store.is_limiting.emit(False)
             
-            # 3. Température Moteur (Simulée car pas de sonde moteur RS485)
-            self.state_store.motor_temp_changed.emit(45 + 5 * math.sin(t/10.0))
-
-            # --- AUCUNE ÉMISSION BMS ICI ---
-            # Ni courant, ni tension, ni cellules, ni SOC.
-            # Tout cela DOIT venir du HardwareService.
-
+            # Note : On ne touche plus au BMS ici.
             time.sleep(0.1)
 
     def stop(self):
