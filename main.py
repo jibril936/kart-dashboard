@@ -1,17 +1,25 @@
-import sys
-import signal
 import argparse
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+import signal
+import sys
 
-from src.main_window import MainWindow
-from src.core.state_store import StateStore
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
+
+from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
 from src.core.mock_service import MockService
-from src.core.hardware_service import HardwareService
+from src.core.state_store import StateStore
+from src.main_window import MainWindow
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Kart Dashboard V3")
     parser.add_argument("--fs", "--fullscreen", action="store_true", help="Mode plein écran")
+    parser.add_argument(
+        "--port",
+        type=str,
+        default=DEFAULT_BMS_PORT,
+        help="Port série BMS (ex: /dev/ttyUSB0)",
+    )
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
@@ -23,9 +31,9 @@ def main() -> int:
     state_store = StateStore()
 
     simu_service = MockService(state_store)
-    bms_service = HardwareService(state_store)
+    bms_service = HardwareService(state_store, port=args.port)
+
     window = MainWindow(state_store)
-    
     if args.fs:
         window.showFullScreen()
     else:
@@ -35,15 +43,22 @@ def main() -> int:
     simu_service.start()
     bms_service.start()
 
-    def shutdown(*_args):
-        simu_service.stop()
-        bms_service.stop()
+    def shutdown(*_sig_args):
+        try:
+            simu_service.stop()
+        except Exception:
+            pass
+        try:
+            bms_service.stop()
+        except Exception:
+            pass
         app.quit()
 
     app.aboutToQuit.connect(shutdown)
     signal.signal(signal.SIGINT, shutdown)
 
     return app.exec()
+
 
 if __name__ == "__main__":
     try:
