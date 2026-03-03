@@ -3,6 +3,7 @@ import signal
 import sys
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt as QtCoreQt  # for QueuedConnection
 from PyQt6.QtWidgets import QApplication
 
 from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
@@ -23,7 +24,6 @@ def main() -> int:
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
-
     if args.fs:
         app.setOverrideCursor(Qt.CursorShape.BlankCursor)
 
@@ -32,12 +32,16 @@ def main() -> int:
     mock_service = MockService(store)
     bms_service = HardwareService(store, port=args.port)
 
+    # Connecte les commandes MOSFET du Store vers le service (thread-safe)
+    store.request_charge_mosfet.connect(bms_service.request_set_charge_mosfet, type=QtCoreQt.ConnectionType.QueuedConnection)
+    store.request_discharge_mosfet.connect(bms_service.request_set_discharge_mosfet, type=QtCoreQt.ConnectionType.QueuedConnection)
+
     window = MainWindow(store)
     if args.fs:
         window.showFullScreen()
     else:
         window.resize(1024, 600)
-        window.show()
+    window.show()
 
     mock_service.start()
     bms_service.start()
@@ -55,7 +59,6 @@ def main() -> int:
 
     app.aboutToQuit.connect(shutdown)
     signal.signal(signal.SIGINT, shutdown)
-
     return app.exec()
 
 

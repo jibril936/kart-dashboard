@@ -15,7 +15,6 @@ from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
 class Lamp(QFrame):
-    """Voyant ultra-compact ON/OFF (optimisé 800x480)."""
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self._on = False
@@ -66,20 +65,11 @@ class Lamp(QFrame):
 
 
 class AlertLamp(Lamp):
-    """Voyant d'alerte (OFF gris / ON rouge)."""
     def set_alert(self, state: bool) -> None:
         super().set_on(state, color_on="#FF4040")
 
 
 class ExpertPage(QWidget):
-    """
-    Expert page:
-      - Carte "BMS HEALTH" cliquable
-      - Overlay plein écran "FULL BMS CONTROL"
-        Optimisé pour 800x480: compaction verticale + lisibilité.
-      - Overlay posé sur self.window() pour couvrir toute l'UI.
-    """
-
     # Bits diagnostics (placeholder -> ajuste si table JK diffère)
     BIT_OV = 0x0004
     BIT_OT = 0x0008
@@ -104,6 +94,9 @@ class ExpertPage(QWidget):
         self._t2 = 0.0
         self._tmos = 0.0
 
+        self._charge_on = False
+        self._discharge_on = False
+
         self._overlay_host = None
         self._host_filter_installed = False
 
@@ -111,9 +104,6 @@ class ExpertPage(QWidget):
         self._build_overlay()
         self._connect_signals()
 
-    # -----------------
-    # Main page
-    # -----------------
     def _build_main(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
@@ -134,9 +124,6 @@ class ExpertPage(QWidget):
         layout.addLayout(row)
         layout.addStretch(1)
 
-    # -----------------
-    # Overlay
-    # -----------------
     def _build_overlay(self) -> None:
         self.overlay = QFrame(self)
         self.overlay.hide()
@@ -147,7 +134,6 @@ class ExpertPage(QWidget):
         root.setContentsMargins(8, 6, 8, 6)
         root.setSpacing(6)
 
-        # Header (très compact)
         header = QFrame(self.overlay)
         header.setFixedHeight(34)
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -227,6 +213,33 @@ class ExpertPage(QWidget):
         self.lamp_discharge = Lamp("DISCHARGE")
         mos_l.addWidget(self.lamp_charge)
         mos_l.addWidget(self.lamp_discharge)
+
+        # --- NEW: manual control buttons ---
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        self.btn_charge_toggle = QPushButton("TOGGLE CHARGE")
+        self.btn_charge_toggle.setFixedHeight(26)
+        self.btn_charge_toggle.setStyleSheet(
+            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
+            "font-family:Orbitron; font-weight:bold; font-size:9px; padding:0 8px; }"
+            "QPushButton:pressed { background:#00FFD0; color:#000; border:none; }"
+        )
+        self.btn_charge_toggle.clicked.connect(self._toggle_charge_mos)
+        btn_row.addWidget(self.btn_charge_toggle)
+
+        self.btn_discharge_toggle = QPushButton("TOGGLE DISCH")
+        self.btn_discharge_toggle.setFixedHeight(26)
+        self.btn_discharge_toggle.setStyleSheet(
+            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
+            "font-family:Orbitron; font-weight:bold; font-size:9px; padding:0 8px; }"
+            "QPushButton:pressed { background:#FF4040; color:#000; border:none; }"
+        )
+        self.btn_discharge_toggle.clicked.connect(self._toggle_discharge_mos)
+        btn_row.addWidget(self.btn_discharge_toggle)
+
+        mos_l.addLayout(btn_row)
+
         right.addWidget(mos_panel)
 
         # REAL-TIME DATA
@@ -259,7 +272,7 @@ class ExpertPage(QWidget):
 
         right.addWidget(rt_panel)
 
-        # BMS DIAGNOSTIC (compact mais lisible)
+        # BMS DIAGNOSTIC
         diag_panel, diag_l = make_panel("BMS DIAGNOSTIC")
 
         self.lbl_mask = QLabel("STATUS: 0x0000")
@@ -275,15 +288,13 @@ class ExpertPage(QWidget):
         diag_l.addWidget(self.al_sc)
 
         right.addWidget(diag_panel)
-
-        # IMPORTANT: pas de stretch agressif qui pousse et casse la lecture
         right.addStretch(1)
 
         content.addLayout(right)
         root.addLayout(content, 1)
 
     # -----------------
-    # Overlay sizing on window() (covers full UI)
+    # Overlay sizing on window()
     # -----------------
     def _ensure_overlay_host(self) -> None:
         host = self.window()
@@ -321,6 +332,16 @@ class ExpertPage(QWidget):
 
     def hide_overlay(self) -> None:
         self.overlay.hide()
+
+    # -----------------
+    # Manual toggle handlers
+    # -----------------
+    def _toggle_charge_mos(self) -> None:
+        # invert last known state
+        self.store.request_set_charge_mosfet(not self._charge_on)
+
+    def _toggle_discharge_mos(self) -> None:
+        self.store.request_set_discharge_mosfet(not self._discharge_on)
 
     # -----------------
     # Signals
@@ -383,8 +404,10 @@ class ExpertPage(QWidget):
 
     @Slot(bool, bool)
     def _on_mosfets(self, charge_on: bool, discharge_on: bool):
-        self.lamp_charge.set_on(charge_on, color_on="#00FFD0")
-        self.lamp_discharge.set_on(discharge_on, color_on="#00FFD0")
+        self._charge_on = bool(charge_on)
+        self._discharge_on = bool(discharge_on)
+        self.lamp_charge.set_on(self._charge_on, color_on="#00FFD0")
+        self.lamp_discharge.set_on(self._discharge_on, color_on="#00FFD0")
 
     @Slot(int)
     def _on_bitmask(self, mask: int):

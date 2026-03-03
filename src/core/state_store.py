@@ -16,8 +16,9 @@ class CellStats:
 class StateStore(QObject):
     """
     SOURCE DE VÉRITÉ
-    - Stockage interne systématique
-    - Setters: update valeur -> emit signal
+    - Toutes les valeurs sont stockées en interne
+    - Setters = update valeur -> emit signal
+    - Ajout: signaux de commande MOSFET (manual control)
     """
 
     # -----------------
@@ -38,17 +39,23 @@ class StateStore(QObject):
     pack_voltage_changed = Signal(float)
     pack_current_changed = Signal(float)
 
-    # Températures BMS (overlay)
-    batt_temp_changed = Signal(float)          # Batterie (on mappe sur 0x82)
-    temp_mosfet_changed = Signal(float)        # MOS/power tube (0x80)
-    temp_sensor_1_changed = Signal(float)      # Battery box (0x81)
-    temp_sensor_2_changed = Signal(float)      # Batterie (0x82)
+    # Températures BMS (REAL-TIME DATA)
+    batt_temp_changed = Signal(float)
+    temp_mosfet_changed = Signal(float)
+    temp_sensor_1_changed = Signal(float)
+    temp_sensor_2_changed = Signal(float)
 
     # Tech JK
     capacity_remaining_ah = Signal(float)
     cycle_count = Signal(int)
-    bms_status_bitmask = Signal(int)           # 0x8B warning bitmask
-    mosfet_status_changed = Signal(bool, bool) # (charge_on, discharge_on) from 0x8C
+    bms_status_bitmask = Signal(int)
+
+    # MOSFET status (lu depuis BMS)
+    mosfet_status_changed = Signal(bool, bool)  # (charge_on, discharge_on)
+
+    # --- NEW: commandes manuelles MOSFET ---
+    request_charge_mosfet = Signal(bool)     # True=ON, False=OFF
+    request_discharge_mosfet = Signal(bool)  # True=ON, False=OFF
 
     # Cellules (overlay)
     cell_voltages_changed = Signal(list)
@@ -56,7 +63,7 @@ class StateStore(QObject):
     cell_max_v = Signal(float)
     cell_delta_v = Signal(float)
 
-    # Optionnel (UI)
+    # Optionnel
     bms_alarm = Signal(str)
 
     def __init__(self) -> None:
@@ -94,6 +101,9 @@ class StateStore(QObject):
         self._cell_voltages: List[float] = []
         self._cell_stats: CellStats = CellStats(0.0, 0.0, 0.0)
 
+    # -----------------
+    # Helpers
+    # -----------------
     @staticmethod
     def _same_float(a: float, b: float, eps: float = 1e-4) -> bool:
         return abs(a - b) <= eps
@@ -223,6 +233,15 @@ class StateStore(QObject):
         self._charge_mosfet_on = c
         self._discharge_mosfet_on = d
         self.mosfet_status_changed.emit(c, d)
+
+    # -----------------
+    # Manual MOSFET control helpers (emit requests)
+    # -----------------
+    def request_set_charge_mosfet(self, enable: bool) -> None:
+        self.request_charge_mosfet.emit(bool(enable))
+
+    def request_set_discharge_mosfet(self, enable: bool) -> None:
+        self.request_discharge_mosfet.emit(bool(enable))
 
     # -----------------
     # Cellules setters
