@@ -15,9 +15,13 @@ from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
 class Lamp(QFrame):
+    STATE_OFF = 0
+    STATE_ON = 1
+    STATE_BLINK = 2
+
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
-        self._on = False
+        self._state: int = self.STATE_OFF
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(34)
@@ -46,22 +50,52 @@ class Lamp(QFrame):
         )
         layout.addWidget(self.badge)
 
-    def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
-        self._on = bool(state)
-        if self._on:
+    @staticmethod
+    def _clamp_state(state: int) -> int:
+        try:
+            v = int(state)
+        except Exception:
+            v = 0
+        return 0 if v < 0 else 2 if v > 2 else v
+
+    def set_state(
+        self,
+        state: int,
+        *,
+        color_on: str = "#00FFD0",
+        color_blink: str = "#FFC000",
+    ) -> None:
+        s = self._clamp_state(state)
+        self._state = s
+
+        if s == self.STATE_ON:
             self.dot.setStyleSheet(f"color:{color_on}; font-size:14px;")
             self.badge.setText("ON")
             self.badge.setStyleSheet(
                 f"background:{color_on}; border:none; border-radius:10px; "
                 "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
-        else:
-            self.dot.setStyleSheet("color:#222; font-size:14px;")
-            self.badge.setText("OFF")
+            return
+
+        if s == self.STATE_BLINK:
+            self.dot.setStyleSheet(f"color:{color_blink}; font-size:14px;")
+            self.badge.setText("BLNK")
             self.badge.setStyleSheet(
-                "background:#111; border:1px solid #222; border-radius:10px; "
-                "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
+                f"background:{color_blink}; border:none; border-radius:10px; "
+                "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
+            return
+
+        # OFF
+        self.dot.setStyleSheet("color:#222; font-size:14px;")
+        self.badge.setText("OFF")
+        self.badge.setStyleSheet(
+            "background:#111; border:1px solid #222; border-radius:10px; "
+            "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
+        )
+
+    def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
+        self.set_state(self.STATE_ON if bool(state) else self.STATE_OFF, color_on=color_on)
 
 
 class AlertLamp(Lamp):
@@ -146,7 +180,6 @@ class ExpertPage(QWidget):
         title = QLabel("FULL BMS CONTROL")
         title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 12px; font-weight: bold;")
         hl.addWidget(title)
-
         hl.addStretch(1)
 
         self.btn_close = QPushButton("CLOSE")
@@ -271,6 +304,26 @@ class ExpertPage(QWidget):
         self.val_tmos = make_kv_row("Temp MOSFET", "0 °C")
 
         right.addWidget(rt_panel)
+        # CHARGER STATUS (Skylla TG)
+        ch_panel, ch_l = make_panel("CHARGER (SKYLLA TG)")
+
+        self.lbl_charger_plug = QLabel("PLUG: --")
+        self.lbl_charger_plug.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
+        ch_l.addWidget(self.lbl_charger_plug)
+
+        self.ch_on = Lamp("ON")
+        self.ch_boost = Lamp("BOOST")
+        self.ch_equalize = Lamp("EQUALIZE")
+        self.ch_float = Lamp("FLOAT")
+        self.ch_failure = Lamp("FAILURE")
+
+        ch_l.addWidget(self.ch_on)
+        ch_l.addWidget(self.ch_boost)
+        ch_l.addWidget(self.ch_equalize)
+        ch_l.addWidget(self.ch_float)
+        ch_l.addWidget(self.ch_failure)
+
+        right.addWidget(ch_panel)
 
         # BMS DIAGNOSTIC
         diag_panel, diag_l = make_panel("BMS DIAGNOSTIC")
@@ -364,6 +417,11 @@ class ExpertPage(QWidget):
             self.store.temp_sensor_2_changed.connect(self._on_t2)
         if hasattr(self.store, "temp_mosfet_changed"):
             self.store.temp_mosfet_changed.connect(self._on_tmos)
+        # Charger (Skylla TG) - simulé pour l'instant
+        if hasattr(self.store, "charger_connected_changed") and hasattr(self, "lbl_charger_plug"):
+            self.store.charger_connected_changed.connect(self._on_charger_connected)
+        if hasattr(self.store, "charger_leds_changed") and hasattr(self, "ch_on"):
+            self.store.charger_leds_changed.connect(self._on_charger_leds)
 
     @Slot(float)
     def _on_vpack(self, v: float):
@@ -413,7 +471,6 @@ class ExpertPage(QWidget):
     def _on_bitmask(self, mask: int):
         bm = int(mask) & 0xFFFF
         self.lbl_mask.setText(f"STATUS: 0x{bm:04X}")
-
         self.al_ov.set_alert(bool(bm & self.BIT_OV))
         self.al_ot.set_alert(bool(bm & self.BIT_OT))
         self.al_sc.set_alert(bool(bm & self.BIT_SC))
@@ -432,6 +489,24 @@ class ExpertPage(QWidget):
     def _on_tmos(self, t: float):
         self._tmos = float(t)
         self.val_tmos.setText(f"{self._tmos:.0f} °C")
+
+    @Slot(bool)
+    def _on_charger_connected(self, plugged: bool) -> None:
+        if plugged:
+            self.lbl_charger_plug.setText("PLUG: YES")
+            self.lbl_charger_plug.setStyleSheet("color:#00FFD0; font-family:Orbitron; font-size:9px; font-weight:bold;")
+        else:
+            self.lbl_charger_plug.setText("PLUG: NO")
+            self.lbl_charger_plug.setStyleSheet("color:#666; font-family:Orbitron; font-size:9px; font-weight:bold;")
+
+    @Slot(int, int, int, int, int)
+    def _on_charger_leds(self, on: int, boost: int, equalize: int, float_: int, failure: int) -> None:
+        # 0=OFF, 1=ON, 2=BLINK
+        self.ch_on.set_state(on, color_on="#00FFD0", color_blink="#FFC000")
+        self.ch_boost.set_state(boost, color_on="#00FFD0", color_blink="#FFC000")
+        self.ch_equalize.set_state(equalize, color_on="#00FFD0", color_blink="#FFC000")
+        self.ch_float.set_state(float_, color_on="#00FFD0", color_blink="#FFC000")
+        self.ch_failure.set_state(failure, color_on="#FF4040", color_blink="#FF4040")
 
     def _refresh_card(self) -> None:
         self.card.update_data(self._vpack, self._delta, self._vmin, self._vmax)

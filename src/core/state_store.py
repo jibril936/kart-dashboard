@@ -63,6 +63,13 @@ class StateStore(QObject):
     cell_max_v = Signal(float)
     cell_delta_v = Signal(float)
 
+    # -----------------
+    # CHARGER (Victron Skylla TG - pour l'instant simulé)
+    # -----------------
+    # 0=OFF, 1=ON, 2=BLINK
+    charger_connected_changed = Signal(bool)
+    charger_leds_changed = Signal(int, int, int, int, int)  # on, boost, equalize, float, failure
+
     # Optionnel
     bms_alarm = Signal(str)
 
@@ -100,6 +107,16 @@ class StateStore(QObject):
 
         self._cell_voltages: List[float] = []
         self._cell_stats: CellStats = CellStats(0.0, 0.0, 0.0)
+
+        # ---
+        # CHARGER (Skylla TG)
+        # ---
+        self._charger_connected: bool = False
+        self._charger_led_on: int = 0
+        self._charger_led_boost: int = 0
+        self._charger_led_equalize: int = 0
+        self._charger_led_float: int = 0
+        self._charger_led_failure: int = 0
 
     # -----------------
     # Helpers
@@ -265,6 +282,55 @@ class StateStore(QObject):
 
     def set_cell_data(self, voltages: list, v_min: float = 0.0, v_max: float = 0.0, delta: float = 0.0) -> None:
         self.set_cell_voltages(list(voltages))
+
+    # -----------------
+    # CHARGER setters
+    # -----------------
+    @staticmethod
+    def _clamp_led_state(state: int) -> int:
+        try:
+            v = int(state)
+        except Exception:
+            v = 0
+        return 0 if v < 0 else 2 if v > 2 else v
+
+    def set_charger_connected(self, val: bool) -> None:
+        v = bool(val)
+        if v == self._charger_connected:
+            return
+        self._charger_connected = v
+        self.charger_connected_changed.emit(v)
+
+    def set_charger_leds(
+        self,
+        *,
+        on: int = 0,
+        boost: int = 0,
+        equalize: int = 0,
+        float_: int = 0,
+        failure: int = 0,
+    ) -> None:
+        on_v = self._clamp_led_state(on)
+        boost_v = self._clamp_led_state(boost)
+        eq_v = self._clamp_led_state(equalize)
+        fl_v = self._clamp_led_state(float_)
+        fa_v = self._clamp_led_state(failure)
+
+        if (
+            on_v == self._charger_led_on
+            and boost_v == self._charger_led_boost
+            and eq_v == self._charger_led_equalize
+            and fl_v == self._charger_led_float
+            and fa_v == self._charger_led_failure
+        ):
+            return
+
+        self._charger_led_on = on_v
+        self._charger_led_boost = boost_v
+        self._charger_led_equalize = eq_v
+        self._charger_led_float = fl_v
+        self._charger_led_failure = fa_v
+        self.charger_leds_changed.emit(on_v, boost_v, eq_v, fl_v, fa_v)
 
     # -----------------
     # Diagnostics
