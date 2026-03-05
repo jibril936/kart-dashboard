@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from qtpy.QtCore import Qt, Slot, QEvent, QTimer
+from qtpy.QtCore import Qt, Slot, QEvent
 from qtpy.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -14,106 +14,30 @@ from qtpy.QtWidgets import (
 from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
-class LedIndicator(QFrame):
-    """
-    Petite LED style "face avant chargeur".
-    state: 0=OFF, 1=ON, 2=BLINK
-    """
-    OFF = 0
-    ON = 1
-    BLINK = 2
-
-    def __init__(self, name: str, *, color_on: str, color_blink: str, parent=None):
-        super().__init__(parent)
-        self._state = self.OFF
-        self._blink_phase = False
-        self._color_on = color_on
-        self._color_blink = color_blink
-
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("QFrame { background: transparent; }")
-
-        l = QVBoxLayout(self)
-        l.setContentsMargins(0, 0, 0, 0)
-        l.setSpacing(2)
-
-        self.dot = QLabel("●")
-        self.dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.dot.setStyleSheet("color:#222; font-size:16px;")
-        l.addWidget(self.dot)
-
-        self.lbl = QLabel(name)
-        self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:8px;")
-        l.addWidget(self.lbl)
-
-        self._timer = QTimer(self)
-        self._timer.setInterval(450)
-        self._timer.timeout.connect(self._on_blink_tick)
-
-    @staticmethod
-    def _clamp(state: int) -> int:
-        try:
-            v = int(state)
-        except Exception:
-            v = 0
-        return 0 if v < 0 else 2 if v > 2 else v
-
-    def set_state(self, state: int) -> None:
-        s = self._clamp(state)
-        if s == self._state:
-            return
-        self._state = s
-        self._blink_phase = False
-
-        if self._state == self.BLINK:
-            self._timer.start()
-        else:
-            self._timer.stop()
-        self._apply()
-
-    def _on_blink_tick(self) -> None:
-        if self._state != self.BLINK:
-            self._timer.stop()
-            return
-        self._blink_phase = not self._blink_phase
-        self._apply()
-
-    def _apply(self) -> None:
-        if self._state == self.ON:
-            self.dot.setStyleSheet(f"color:{self._color_on}; font-size:16px;")
-            return
-
-        if self._state == self.BLINK:
-            # alterne entre ON et OFF visuellement
-            if self._blink_phase:
-                self.dot.setStyleSheet(f"color:{self._color_blink}; font-size:16px;")
-            else:
-                self.dot.setStyleSheet("color:#222; font-size:16px;")
-            return
-
-        self.dot.setStyleSheet("color:#222; font-size:16px;")
-
-
 class Lamp(QFrame):
-    def __init__(self, title: str, parent=None):
+    """Lampe ON/OFF stylée par QSS via properties (state/kind)."""
+
+    def __init__(self, title: str, parent=None, kind: str | None = None):
         super().__init__(parent)
         self._on = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(34)
-        self.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:12px; }")
+
+        self.setObjectName("StatusLamp")
+        if kind:
+            self.setProperty("kind", kind)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(8)
 
         self.dot = QLabel("●")
-        self.dot.setStyleSheet("color:#222; font-size:14px;")
+        self.dot.setObjectName("LampDot")
         layout.addWidget(self.dot)
 
         self.lbl_title = QLabel(title)
-        self.lbl_title.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
+        self.lbl_title.setObjectName("LampLabel")
         layout.addWidget(self.lbl_title)
 
         layout.addStretch(1)
@@ -121,33 +45,28 @@ class Lamp(QFrame):
         self.badge = QLabel("OFF")
         self.badge.setFixedSize(44, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.badge.setStyleSheet(
-            "background:#111; border:1px solid #222; border-radius:10px; "
-            "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
-        )
+        self.badge.setObjectName("LampBadge")
         layout.addWidget(self.badge)
 
-    def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
+        self.set_on(False)
+
+    def set_on(self, state: bool) -> None:
         self._on = bool(state)
-        if self._on:
-            self.dot.setStyleSheet(f"color:{color_on}; font-size:14px;")
-            self.badge.setText("ON")
-            self.badge.setStyleSheet(
-                f"background:{color_on}; border:none; border-radius:10px; "
-                "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
-            )
-        else:
-            self.dot.setStyleSheet("color:#222; font-size:14px;")
-            self.badge.setText("OFF")
-            self.badge.setStyleSheet(
-                "background:#111; border:1px solid #222; border-radius:10px; "
-                "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
-            )
+        self.setProperty("state", "on" if self._on else "off")
+        self.badge.setText("ON" if self._on else "OFF")
+
+        # Force QSS refresh when dynamic properties change
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
 
 
 class AlertLamp(Lamp):
+    def __init__(self, title: str, parent=None):
+        super().__init__(title, parent=parent, kind="danger")
+
     def set_alert(self, state: bool) -> None:
-        super().set_on(state, color_on="#FF4040")
+        self.set_on(state)
 
 
 class ExpertPage(QWidget):
@@ -161,169 +80,191 @@ class ExpertPage(QWidget):
         self.store = store
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background-color: black;")
 
         self._vpack = 0.0
         self._current = 0.0
         self._power_kw = 0.0
-
         self._vmin = 0.0
         self._vmax = 0.0
         self._delta = 0.0
-
         self._t1 = 0.0
         self._t2 = 0.0
         self._tmos = 0.0
-
+        self._soc = 0
+        self._cap_ah = 0.0
+        self._cycles = 0
         self._charge_on = False
         self._discharge_on = False
-
         self._overlay_host = None
         self._host_filter_installed = False
-
-        # Charger LED state cache
-        self._charger_plugged = False
 
         self._build_main()
         self._build_overlay()
         self._connect_signals()
 
     # -----------------
-    # MAIN SCREEN (card + charger box)
+    # UI helpers
+    # -----------------
+    def _make_card(self, title: str) -> tuple[QFrame, QVBoxLayout]:
+        card = QFrame(self)
+        card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        card.setObjectName("Card")
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(14, 12, 14, 12)
+        v.setSpacing(8)
+
+        t = QLabel(title)
+        t.setObjectName("CardTitle")
+        v.addWidget(t)
+
+        return card, v
+
+    def _kv(self, key: str, initial: str = "--") -> tuple[QHBoxLayout, QLabel]:
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        k = QLabel(key)
+        k.setObjectName("Muted")
+
+        val = QLabel(initial)
+        val.setObjectName("Value")
+        val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        val.setMinimumWidth(90)
+
+        row.addWidget(k)
+        row.addStretch(1)
+        row.addWidget(val)
+        return row, val
+
+    # -----------------
+    # Main page
     # -----------------
     def _build_main(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(16)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        row = QHBoxLayout()
-        row.setSpacing(16)
+        top = QHBoxLayout()
+        top.setSpacing(12)
 
-        self.card = BMSSummaryCard(self)
-        self.card.clicked.connect(self.show_overlay)
-        row.addWidget(self.card)
+        # Left: BMS HEALTH (tap -> overlay)
+        self.card_bms = BMSSummaryCard(self)
+        self.card_bms.clicked.connect(self.show_overlay)
+        top.addWidget(self.card_bms)
 
-        # ---- Charger box (ici, pas dans l'overlay BMS)
-        self.charger_box = QFrame(self)
-        self.charger_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.charger_box.setStyleSheet("QFrame { background:#060606; border:1px solid #222; border-radius:16px; }")
+        # Right column: CHARGEUR + BMS STATS
+        right_col = QVBoxLayout()
+        right_col.setSpacing(12)
 
-        cb = QVBoxLayout(self.charger_box)
-        cb.setContentsMargins(14, 12, 14, 12)
-        cb.setSpacing(10)
+        # --- Charger card ---
+        self.charger_card, charger_l = self._make_card("CHARGEUR")
 
-        title = QLabel("CHARGER (SKYLLA TG)")
-        title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 11px; font-weight: bold;")
-        cb.addWidget(title)
+        lamp_row = QHBoxLayout()
+        lamp_row.setSpacing(10)
+        self.lamp_charge_main = Lamp("MOS CHARGE")
+        self.lamp_discharge_main = Lamp("MOS DISCH")
+        lamp_row.addWidget(self.lamp_charge_main, 1)
+        lamp_row.addWidget(self.lamp_discharge_main, 1)
+        charger_l.addLayout(lamp_row)
 
-        self.lbl_plug = QLabel("PLUG: --")
-        self.lbl_plug.setStyleSheet("color:#777; font-family:Orbitron; font-size:9px; font-weight:bold;")
-        cb.addWidget(self.lbl_plug)
+        row, self.val_vbat_main = self._kv("Vbat", "--.- V")
+        charger_l.addLayout(row)
+        row, self.val_ibat_main = self._kv("Ibat", "--.- A")
+        charger_l.addLayout(row)
+        row, self.val_p_main = self._kv("P", "--.- kW")
+        charger_l.addLayout(row)
 
-        leds = QHBoxLayout()
-        leds.setSpacing(14)
+        self.lbl_charge_mode = QLabel("—")
+        self.lbl_charge_mode.setObjectName("Hint")
+        charger_l.addWidget(self.lbl_charge_mode)
 
-        self.led_on = LedIndicator("ON", color_on="#00FFD0", color_blink="#FFC000")
-        self.led_boost = LedIndicator("BOOST", color_on="#00FFD0", color_blink="#FFC000")
-        self.led_equalize = LedIndicator("EQUALIZE", color_on="#00FFD0", color_blink="#FFC000")
-        self.led_float = LedIndicator("FLOAT", color_on="#00FFD0", color_blink="#FFC000")
-        self.led_failure = LedIndicator("FAILURE", color_on="#FF4040", color_blink="#FF4040")
+        right_col.addWidget(self.charger_card)
 
-        leds.addWidget(self.led_on)
-        leds.addWidget(self.led_boost)
-        leds.addWidget(self.led_equalize)
-        leds.addWidget(self.led_float)
-        leds.addWidget(self.led_failure)
-        leds.addStretch(1)
+        # --- BMS stats / diag card ---
+        self.stats_card, stats_l = self._make_card("BMS STATS / DIAG")
 
-        cb.addLayout(leds)
+        row, self.val_soc = self._kv("SOC", "-- %")
+        stats_l.addLayout(row)
+        row, self.val_cap = self._kv("Restant", "--.- Ah")
+        stats_l.addLayout(row)
+        row, self.val_cycles = self._kv("Cycles", "--")
+        stats_l.addLayout(row)
 
-        vals = QHBoxLayout()
-        vals.setSpacing(10)
+        self.lbl_mask_main = QLabel("STATUS: 0x0000")
+        self.lbl_mask_main.setObjectName("Value")
+        stats_l.addWidget(self.lbl_mask_main)
 
-        k1 = QLabel("VBAT")
-        k1.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
-        self.lbl_vbat = QLabel("--.- V")
-        self.lbl_vbat.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:12px; font-weight:bold;")
+        self.al_ov_main = AlertLamp("OV (Overvoltage)")
+        self.al_ot_main = AlertLamp("OT (Overtemp)")
+        self.al_sc_main = AlertLamp("SC (Short-circuit)")
+        stats_l.addWidget(self.al_ov_main)
+        stats_l.addWidget(self.al_ot_main)
+        stats_l.addWidget(self.al_sc_main)
 
-        k2 = QLabel("IBAT")
-        k2.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
-        self.lbl_ibat = QLabel("--.- A")
-        self.lbl_ibat.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:12px; font-weight:bold;")
+        right_col.addWidget(self.stats_card)
+        right_col.addStretch(1)
 
-        vals.addWidget(k1)
-        vals.addWidget(self.lbl_vbat)
-        vals.addSpacing(18)
-        vals.addWidget(k2)
-        vals.addWidget(self.lbl_ibat)
-        vals.addStretch(1)
-
-        cb.addLayout(vals)
-
-        row.addWidget(self.charger_box, 1)
-
-        layout.addLayout(row)
-        layout.addStretch(1)
+        top.addLayout(right_col, 1)
+        root.addLayout(top, 1)
 
     # -----------------
-    # OVERLAY BMS (cells, mosfets, diag) - inchangé
+    # Overlay (cells + controls)
     # -----------------
     def _build_overlay(self) -> None:
         self.overlay = QFrame(self)
         self.overlay.hide()
         self.overlay.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.overlay.setStyleSheet("QFrame { background-color: rgba(0, 0, 0, 250); border:none; }")
+        self.overlay.setObjectName("Overlay")
 
         root = QVBoxLayout(self.overlay)
-        root.setContentsMargins(8, 6, 8, 6)
-        root.setSpacing(6)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(8)
 
+        # Header
         header = QFrame(self.overlay)
-        header.setFixedHeight(34)
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        header.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:12px; }")
+        header.setObjectName("Card")
+        header.setFixedHeight(40)
 
         hl = QHBoxLayout(header)
-        hl.setContentsMargins(10, 4, 10, 4)
-        hl.setSpacing(8)
+        hl.setContentsMargins(12, 6, 12, 6)
+        hl.setSpacing(10)
 
         title = QLabel("FULL BMS CONTROL")
-        title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 12px; font-weight: bold;")
+        title.setObjectName("CardTitle")
         hl.addWidget(title)
+
         hl.addStretch(1)
 
         self.btn_close = QPushButton("CLOSE")
-        self.btn_close.setFixedSize(78, 24)
-        self.btn_close.setStyleSheet(
-            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
-            "font-family:Orbitron; font-weight:bold; font-size:9px; }"
-            "QPushButton:pressed { background:#00FFD0; color:#000; border:none; }"
-        )
+        self.btn_close.setFixedSize(90, 28)
         self.btn_close.clicked.connect(self.hide_overlay)
         hl.addWidget(self.btn_close)
 
         root.addWidget(header)
 
         content = QHBoxLayout()
-        content.setSpacing(8)
+        content.setSpacing(10)
 
         # Cells grid
         grid_wrap = QFrame(self.overlay)
         grid_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        grid_wrap.setStyleSheet("QFrame { background:#050505; border:1px solid #222; border-radius:14px; }")
+        grid_wrap.setObjectName("Card")
 
         grid_layout = QVBoxLayout(grid_wrap)
-        grid_layout.setContentsMargins(10, 8, 10, 8)
-        grid_layout.setSpacing(4)
+        grid_layout.setContentsMargins(12, 10, 12, 10)
+        grid_layout.setSpacing(8)
 
         lbl_cells = QLabel("CELLS")
-        lbl_cells.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:10px;")
+        lbl_cells.setObjectName("Muted")
         grid_layout.addWidget(lbl_cells)
 
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(8)
+        grid.setVerticalSpacing(10)
 
         self.cell_widgets = []
         for i in range(16):
@@ -334,23 +275,15 @@ class ExpertPage(QWidget):
         grid_layout.addLayout(grid, 1)
         content.addWidget(grid_wrap, 1)
 
-        # Right column
+        # Right column in overlay
         right = QVBoxLayout()
-        right.setSpacing(6)
+        right.setSpacing(10)
 
         def make_panel(title_text: str) -> tuple[QFrame, QVBoxLayout]:
-            panel = QFrame(self.overlay)
-            panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-            panel.setStyleSheet("QFrame { background:#0A0A0A; border:1px solid #222; border-radius:14px; }")
-            v = QVBoxLayout(panel)
-            v.setContentsMargins(10, 8, 10, 8)
-            v.setSpacing(4)
-            t = QLabel(title_text)
-            t.setStyleSheet("color: cyan; font-family:Orbitron; font-size:10px;")
-            v.addWidget(t)
+            panel, v = self._make_card(title_text)
             return panel, v
 
-        # MOSFET STATUS
+        # MOSFET STATUS + manual toggles
         mos_panel, mos_l = make_panel("MOSFET STATUS")
         self.lamp_charge = Lamp("CHARGE")
         self.lamp_discharge = Lamp("DISCHARGE")
@@ -358,25 +291,16 @@ class ExpertPage(QWidget):
         mos_l.addWidget(self.lamp_discharge)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
+        btn_row.setSpacing(10)
 
         self.btn_charge_toggle = QPushButton("TOGGLE CHARGE")
-        self.btn_charge_toggle.setFixedHeight(26)
-        self.btn_charge_toggle.setStyleSheet(
-            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
-            "font-family:Orbitron; font-weight:bold; font-size:9px; padding:0 8px; }"
-            "QPushButton:pressed { background:#00FFD0; color:#000; border:none; }"
-        )
+        self.btn_charge_toggle.setFixedHeight(30)
         self.btn_charge_toggle.clicked.connect(self._toggle_charge_mos)
         btn_row.addWidget(self.btn_charge_toggle)
 
         self.btn_discharge_toggle = QPushButton("TOGGLE DISCH")
-        self.btn_discharge_toggle.setFixedHeight(26)
-        self.btn_discharge_toggle.setStyleSheet(
-            "QPushButton { background:#111; color:#DDD; border:1px solid #222; border-radius:10px; "
-            "font-family:Orbitron; font-weight:bold; font-size:9px; padding:0 8px; }"
-            "QPushButton:pressed { background:#FF4040; color:#000; border:none; }"
-        )
+        self.btn_discharge_toggle.setFixedHeight(30)
+        self.btn_discharge_toggle.setProperty("variant", "danger")
         self.btn_discharge_toggle.clicked.connect(self._toggle_discharge_mos)
         btn_row.addWidget(self.btn_discharge_toggle)
 
@@ -385,72 +309,54 @@ class ExpertPage(QWidget):
 
         # REAL-TIME DATA
         rt_panel, rt_l = make_panel("REAL-TIME DATA")
-
-        def make_kv_row(label: str, initial: str) -> QLabel:
-            row = QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(6)
-
-            k = QLabel(label)
-            k.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
-
-            v = QLabel(initial)
-            v.setMinimumWidth(70)
-            v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            v.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:10px; font-weight:bold;")
-
-            row.addWidget(k)
-            row.addStretch(1)
-            row.addWidget(v)
-            rt_l.addLayout(row)
-            return v
-
-        self.val_current = make_kv_row("Courant", "0.0 A")
-        self.val_power = make_kv_row("Puissance", "0.0 kW")
-        self.val_t1 = make_kv_row("Temp Sonde 1", "0 °C")
-        self.val_t2 = make_kv_row("Temp Sonde 2", "0 °C")
-        self.val_tmos = make_kv_row("Temp MOSFET", "0 °C")
+        row, self.val_current = self._kv("Courant", "0.0 A")
+        rt_l.addLayout(row)
+        row, self.val_power = self._kv("Puissance", "0.0 kW")
+        rt_l.addLayout(row)
+        row, self.val_t1 = self._kv("Temp Sonde 1", "0 °C")
+        rt_l.addLayout(row)
+        row, self.val_t2 = self._kv("Temp Sonde 2", "0 °C")
+        rt_l.addLayout(row)
+        row, self.val_tmos = self._kv("Temp MOSFET", "0 °C")
+        rt_l.addLayout(row)
         right.addWidget(rt_panel)
 
         # BMS DIAGNOSTIC
         diag_panel, diag_l = make_panel("BMS DIAGNOSTIC")
         self.lbl_mask = QLabel("STATUS: 0x0000")
-        self.lbl_mask.setStyleSheet("color:#DDD; font-family:Orbitron; font-size:11px; font-weight:bold;")
+        self.lbl_mask.setObjectName("Value")
         diag_l.addWidget(self.lbl_mask)
-
         self.al_ov = AlertLamp("OV (Overvoltage)")
         self.al_ot = AlertLamp("OT (Overtemp)")
         self.al_sc = AlertLamp("SC (Short-circuit)")
         diag_l.addWidget(self.al_ov)
         diag_l.addWidget(self.al_ot)
         diag_l.addWidget(self.al_sc)
-
         right.addWidget(diag_panel)
-        right.addStretch(1)
 
-        content.addLayout(right)
+        right.addStretch(1)
+        content.addLayout(right, 1)
+
         root.addLayout(content, 1)
 
     # -----------------
-    # Overlay sizing on window()
+    # Overlay geometry
     # -----------------
     def _ensure_overlay_host(self) -> None:
         host = self.window()
         if host is None:
             return
-
         if self._overlay_host is not host:
             self._overlay_host = host
-
-        if self.overlay.parentWidget() is not host:
-            self.overlay.setParent(host)
+            if self.overlay.parentWidget() is not host:
+                self.overlay.setParent(host)
             self.overlay.raise_()
 
-        if not self._host_filter_installed:
-            host.installEventFilter(self)
-            self._host_filter_installed = True
+            if not self._host_filter_installed:
+                host.installEventFilter(self)
+                self._host_filter_installed = True
 
-        self._sync_overlay_geometry()
+            self._sync_overlay_geometry()
 
     def _sync_overlay_geometry(self) -> None:
         if self._overlay_host is None:
@@ -472,7 +378,7 @@ class ExpertPage(QWidget):
         self.overlay.hide()
 
     # -----------------
-    # Manual toggle handlers
+    # Manual MOSFET control
     # -----------------
     def _toggle_charge_mos(self) -> None:
         self.store.request_set_charge_mosfet(not self._charge_on)
@@ -486,14 +392,20 @@ class ExpertPage(QWidget):
     def _connect_signals(self) -> None:
         self.store.pack_voltage_changed.connect(self._on_vpack)
         self.store.pack_current_changed.connect(self._on_current)
-
         self.store.cell_min_v.connect(self._on_vmin)
         self.store.cell_max_v.connect(self._on_vmax)
         self.store.cell_delta_v.connect(self._on_delta)
         self.store.cell_voltages_changed.connect(self._on_cells)
-
         self.store.mosfet_status_changed.connect(self._on_mosfets)
         self.store.bms_status_bitmask.connect(self._on_bitmask)
+
+        # Optional JK tech
+        if hasattr(self.store, "soc_changed"):
+            self.store.soc_changed.connect(self._on_soc)
+        if hasattr(self.store, "capacity_remaining_ah"):
+            self.store.capacity_remaining_ah.connect(self._on_cap)
+        if hasattr(self.store, "cycle_count"):
+            self.store.cycle_count.connect(self._on_cycles)
 
         if hasattr(self.store, "temp_sensor_1_changed"):
             self.store.temp_sensor_1_changed.connect(self._on_t1)
@@ -502,29 +414,37 @@ class ExpertPage(QWidget):
         if hasattr(self.store, "temp_mosfet_changed"):
             self.store.temp_mosfet_changed.connect(self._on_tmos)
 
-        # Charger (simu pour l'instant)
-        if hasattr(self.store, "charger_connected_changed"):
-            self.store.charger_connected_changed.connect(self._on_charger_connected)
-        if hasattr(self.store, "charger_leds_changed"):
-            self.store.charger_leds_changed.connect(self._on_charger_leds)
+    def _refresh_charger_block(self) -> None:
+        self.val_vbat_main.setText(f"{self._vpack:.1f} V")
+        self.val_ibat_main.setText(f"{self._current:.1f} A")
+        self.val_p_main.setText(f"{self._power_kw:.1f} kW")
+
+        if abs(self._current) < 0.5:
+            self.lbl_charge_mode.setText("IDLE")
+        elif self._current < 0:
+            self.lbl_charge_mode.setText("CHARGING (Ibat < 0)")
+        else:
+            self.lbl_charge_mode.setText("DISCHARGING (Ibat > 0)")
+
+    def _refresh_card(self) -> None:
+        self.card_bms.update_data(self._vpack, self._delta, self._vmin, self._vmax)
+
+    def _recalc_power(self) -> None:
+        self._power_kw = (self._vpack * self._current) / 1000.0
+        self.val_current.setText(f"{self._current:.1f} A")
+        self.val_power.setText(f"{self._power_kw:.1f} kW")
+        self._refresh_charger_block()
 
     @Slot(float)
     def _on_vpack(self, v: float):
         self._vpack = float(v)
         self._recalc_power()
         self._refresh_card()
-        self.lbl_vbat.setText(f"{self._vpack:.1f} V")
 
     @Slot(float)
     def _on_current(self, a: float):
         self._current = float(a)
         self._recalc_power()
-        self.lbl_ibat.setText(f"{self._current:.1f} A")
-
-    def _recalc_power(self):
-        self._power_kw = (self._vpack * self._current) / 1000.0
-        self.val_current.setText(f"{self._current:.1f} A")
-        self.val_power.setText(f"{self._power_kw:.1f} kW")
 
     @Slot(float)
     def _on_vmin(self, v: float):
@@ -551,16 +471,48 @@ class ExpertPage(QWidget):
     def _on_mosfets(self, charge_on: bool, discharge_on: bool):
         self._charge_on = bool(charge_on)
         self._discharge_on = bool(discharge_on)
-        self.lamp_charge.set_on(self._charge_on, color_on="#00FFD0")
-        self.lamp_discharge.set_on(self._discharge_on, color_on="#00FFD0")
+
+        # Main page
+        self.lamp_charge_main.set_on(self._charge_on)
+        self.lamp_discharge_main.set_on(self._discharge_on)
+
+        # Overlay
+        self.lamp_charge.set_on(self._charge_on)
+        self.lamp_discharge.set_on(self._discharge_on)
 
     @Slot(int)
     def _on_bitmask(self, mask: int):
         bm = int(mask) & 0xFFFF
+
         self.lbl_mask.setText(f"STATUS: 0x{bm:04X}")
-        self.al_ov.set_alert(bool(bm & self.BIT_OV))
-        self.al_ot.set_alert(bool(bm & self.BIT_OT))
-        self.al_sc.set_alert(bool(bm & self.BIT_SC))
+        self.lbl_mask_main.setText(f"STATUS: 0x{bm:04X}")
+
+        ov = bool(bm & self.BIT_OV)
+        ot = bool(bm & self.BIT_OT)
+        sc = bool(bm & self.BIT_SC)
+
+        self.al_ov.set_alert(ov)
+        self.al_ot.set_alert(ot)
+        self.al_sc.set_alert(sc)
+
+        self.al_ov_main.set_alert(ov)
+        self.al_ot_main.set_alert(ot)
+        self.al_sc_main.set_alert(sc)
+
+    @Slot(int)
+    def _on_soc(self, soc: int):
+        self._soc = int(soc)
+        self.val_soc.setText(f"{self._soc:d} %")
+
+    @Slot(float)
+    def _on_cap(self, ah: float):
+        self._cap_ah = float(ah)
+        self.val_cap.setText(f"{self._cap_ah:.1f} Ah")
+
+    @Slot(int)
+    def _on_cycles(self, c: int):
+        self._cycles = int(c)
+        self.val_cycles.setText(f"{self._cycles:d}")
 
     @Slot(float)
     def _on_t1(self, t: float):
@@ -576,30 +528,3 @@ class ExpertPage(QWidget):
     def _on_tmos(self, t: float):
         self._tmos = float(t)
         self.val_tmos.setText(f"{self._tmos:.0f} °C")
-
-    @Slot(bool)
-    def _on_charger_connected(self, plugged: bool) -> None:
-        self._charger_plugged = bool(plugged)
-        if self._charger_plugged:
-            self.lbl_plug.setText("PLUG: YES")
-            self.lbl_plug.setStyleSheet("color:#00FFD0; font-family:Orbitron; font-size:9px; font-weight:bold;")
-        else:
-            self.lbl_plug.setText("PLUG: NO")
-            self.lbl_plug.setStyleSheet("color:#777; font-family:Orbitron; font-size:9px; font-weight:bold;")
-            # reset LEDs
-            self.led_on.set_state(0)
-            self.led_boost.set_state(0)
-            self.led_equalize.set_state(0)
-            self.led_float.set_state(0)
-            self.led_failure.set_state(0)
-
-    @Slot(int, int, int, int, int)
-    def _on_charger_leds(self, on: int, boost: int, equalize: int, float_: int, failure: int) -> None:
-        self.led_on.set_state(on)
-        self.led_boost.set_state(boost)
-        self.led_equalize.set_state(equalize)
-        self.led_float.set_state(float_)
-        self.led_failure.set_state(failure)
-
-    def _refresh_card(self) -> None:
-        self.card.update_data(self._vpack, self._delta, self._vmin, self._vmax)

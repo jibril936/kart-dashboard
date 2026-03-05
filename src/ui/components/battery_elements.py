@@ -9,6 +9,7 @@ class CircularBatteryWidget(QWidget):
     """
     Widget SOC circulaire (utilisé par ClusterPage).
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(220, 220)
@@ -53,6 +54,7 @@ class BMSSummaryCard(QFrame):
     Carte "BMS HEALTH" cliquable.
     Affiche Vpack + stats cellules.
     """
+
     clicked = Signal()
 
     def __init__(self, parent=None):
@@ -60,55 +62,65 @@ class BMSSummaryCard(QFrame):
 
         self.setFixedSize(320, 240)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(
-            "QFrame { background-color: #0A0A0A; border: 1px solid #222; border-radius: 16px; }"
-        )
+        self.setObjectName("Card")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(10)
 
         title = QLabel("BMS HEALTH")
-        title.setStyleSheet("color: cyan; font-size: 11px; border:none; font-family:'Orbitron';")
+        title.setObjectName("CardTitle")
         layout.addWidget(title)
 
         self.lbl_vpack = QLabel("0.0 V")
-        self.lbl_vpack.setStyleSheet(
-            "color: white; font-size: 40px; font-weight: bold; border:none; font-family:'Orbitron';"
-        )
+        self.lbl_vpack.setObjectName("ValueBig")
         layout.addWidget(self.lbl_vpack)
 
         self.lbl_delta = QLabel("ΔV: 0.000 V")
-        self.lbl_delta.setStyleSheet("color: #00FF7F; font-size: 16px; border:none; font-family:'Orbitron';")
+        self.lbl_delta.setObjectName("ValueGood")
         layout.addWidget(self.lbl_delta)
 
         self.min_bar = self._add_bar(layout, "MIN")
         self.max_bar = self._add_bar(layout, "MAX")
 
         hint = QLabel("Tap to open FULL BMS CONTROL")
-        hint.setStyleSheet("color:#444; font-size:10px; border:none; font-family:'Orbitron';")
+        hint.setObjectName("Hint")
         layout.addWidget(hint)
 
         layout.addStretch(1)
 
-    def _add_bar(self, layout, name: str):
+    def _polish(self, w):
+        w.style().unpolish(w)
+        w.style().polish(w)
+        w.update()
+
+    def _set_delta_level(self, delta: float) -> None:
+        # seuils simples (à ajuster si besoin)
+        if delta >= 0.150:
+            name = "ValueBad"
+        elif delta >= 0.080:
+            name = "ValueWarn"
+        else:
+            name = "ValueGood"
+
+        if self.lbl_delta.objectName() != name:
+            self.lbl_delta.setObjectName(name)
+            self._polish(self.lbl_delta)
+
+    def _add_bar(self, layout: QVBoxLayout, name: str):
         row = QHBoxLayout()
         row.setSpacing(8)
 
         lbl = QLabel(name)
-        lbl.setStyleSheet("color:#666; font-size:9px; border:none; font-family:'Orbitron';")
+        lbl.setObjectName("Muted")
 
         bar = QProgressBar()
         bar.setFixedHeight(6)
         bar.setTextVisible(False)
         bar.setRange(0, 100)
-        bar.setStyleSheet(
-            "QProgressBar { background:#111; border:none; border-radius:3px; } "
-            "QProgressBar::chunk { background:cyan; border-radius:3px; }"
-        )
 
         val = QLabel("0.00V")
-        val.setStyleSheet("color:white; font-size:11px; border:none; font-family:'Orbitron';")
+        val.setObjectName("Value")
 
         row.addWidget(lbl)
         row.addWidget(bar, 1)
@@ -123,6 +135,7 @@ class BMSSummaryCard(QFrame):
     def update_data(self, vpack: float, delta: float, v_min: float, v_max: float) -> None:
         self.lbl_vpack.setText(f"{vpack:.1f} V")
         self.lbl_delta.setText(f"ΔV: {delta:.3f} V")
+        self._set_delta_level(delta)
 
         v_lo, v_hi = 2.50, 3.65
         span = max(1e-6, (v_hi - v_lo))
@@ -139,17 +152,17 @@ class BMSSummaryCard(QFrame):
 class BatteryIcon(QWidget):
     """
     BatteryIcon cellule COMPACT (Overlay)
-      - Hauteur ~58px max
-      - Numéro cellule à GAUCHE de la barre
-      - Barre plus basse
-      - Voltage en dessous (petit)
-      - Tension: 2.50V -> 3.65V
+    - Hauteur ~58px max
+    - Numéro cellule à GAUCHE de la barre
+    - Barre plus basse
+    - Voltage en dessous (petit)
 
-      Couleurs:
-        Rouge  : V<3.0V ou V>3.6V
-        Orange : 3.0V-3.2V
-        Vert   : 3.2V-3.45V
-        Bleu   : >3.45V
+    Tension: 2.50V -> 3.65V
+    Couleurs:
+      Rouge : V<3.0V ou V>3.6V
+      Orange : 3.0V-3.2V
+      Vert : 3.2V-3.45V
+      Bleu : >3.45V
     """
 
     V_MIN = 2.50
@@ -184,22 +197,25 @@ class BatteryIcon(QWidget):
         h = self.height()
 
         # Geometry compact
-        # Left cell id area + right bar
         id_w = 24
         bar_x = id_w + 6
         bar_y = 12
         bar_w = w - bar_x - 8
-        bar_h = 12  # reduced height
+        bar_h = 12
 
         v = self.voltage
         ratio = (v - self.V_MIN) / (self.V_MAX - self.V_MIN)
         ratio = max(0.0, min(1.0, ratio))
         fill_w = int((bar_w - 4) * ratio)
 
-        # ID text on the left (centered vertically on bar)
+        # ID text on the left
         p.setPen(QColor(170, 170, 170))
         p.setFont(QFont("Orbitron", 8, QFont.Weight.Bold))
-        p.drawText(QRect(0, bar_y - 2, id_w + 2, bar_h + 4), Qt.AlignmentFlag.AlignCenter, f"#{self.cell_id}")
+        p.drawText(
+            QRect(0, bar_y - 2, id_w + 2, bar_h + 4),
+            Qt.AlignmentFlag.AlignCenter,
+            f"#{self.cell_id}",
+        )
 
         # Bar outline
         p.setPen(QPen(QColor(90, 90, 90), 1))
@@ -212,7 +228,11 @@ class BatteryIcon(QWidget):
         if fill_w > 0:
             p.drawRoundedRect(bar_x + 2, bar_y + 2, fill_w, bar_h - 4, 3, 3)
 
-        # Voltage below (small font, minimal spacing)
+        # Voltage below
         p.setPen(QColor(245, 245, 245))
         p.setFont(QFont("Orbitron", 8))
-        p.drawText(QRect(0, h - 22, w, 20), Qt.AlignmentFlag.AlignCenter, f"{v:.2f}V")
+        p.drawText(
+            QRect(0, h - 22, w, 20),
+            Qt.AlignmentFlag.AlignCenter,
+            f"{v:.2f}V",
+        )
