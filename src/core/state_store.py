@@ -18,7 +18,6 @@ class StateStore(QObject):
     SOURCE DE VÉRITÉ
     - Toutes les valeurs sont stockées en interne
     - Setters = update valeur -> emit signal
-    - Ajout: signaux de commande MOSFET (manual control)
     """
 
     # -----------------
@@ -53,7 +52,7 @@ class StateStore(QObject):
     # MOSFET status (lu depuis BMS)
     mosfet_status_changed = Signal(bool, bool)  # (charge_on, discharge_on)
 
-    # --- NEW: commandes manuelles MOSFET ---
+    # Commandes manuelles MOSFET
     request_charge_mosfet = Signal(bool)     # True=ON, False=OFF
     request_discharge_mosfet = Signal(bool)  # True=ON, False=OFF
 
@@ -64,7 +63,7 @@ class StateStore(QObject):
     cell_delta_v = Signal(float)
 
     # -----------------
-    # CHARGER (Victron Skylla TG - pour l'instant simulé)
+    # CHARGER (Skylla TG) - pour l'instant simulé
     # -----------------
     # 0=OFF, 1=ON, 2=BLINK
     charger_connected_changed = Signal(bool)
@@ -109,7 +108,7 @@ class StateStore(QObject):
         self._cell_stats: CellStats = CellStats(0.0, 0.0, 0.0)
 
         # ---
-        # CHARGER (Skylla TG)
+        # CHARGER
         # ---
         self._charger_connected: bool = False
         self._charger_led_on: int = 0

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from qtpy.QtCore import Qt, Slot, QEvent
+from qtpy.QtCore import Qt, Slot, QEvent, QTimer
 from qtpy.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -14,14 +14,91 @@ from qtpy.QtWidgets import (
 from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
-class Lamp(QFrame):
-    STATE_OFF = 0
-    STATE_ON = 1
-    STATE_BLINK = 2
+class LedIndicator(QFrame):
+    """
+    Petite LED style "face avant chargeur".
+    state: 0=OFF, 1=ON, 2=BLINK
+    """
+    OFF = 0
+    ON = 1
+    BLINK = 2
 
+    def __init__(self, name: str, *, color_on: str, color_blink: str, parent=None):
+        super().__init__(parent)
+        self._state = self.OFF
+        self._blink_phase = False
+        self._color_on = color_on
+        self._color_blink = color_blink
+
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("QFrame { background: transparent; }")
+
+        l = QVBoxLayout(self)
+        l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(2)
+
+        self.dot = QLabel("●")
+        self.dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.dot.setStyleSheet("color:#222; font-size:16px;")
+        l.addWidget(self.dot)
+
+        self.lbl = QLabel(name)
+        self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:8px;")
+        l.addWidget(self.lbl)
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(450)
+        self._timer.timeout.connect(self._on_blink_tick)
+
+    @staticmethod
+    def _clamp(state: int) -> int:
+        try:
+            v = int(state)
+        except Exception:
+            v = 0
+        return 0 if v < 0 else 2 if v > 2 else v
+
+    def set_state(self, state: int) -> None:
+        s = self._clamp(state)
+        if s == self._state:
+            return
+        self._state = s
+        self._blink_phase = False
+
+        if self._state == self.BLINK:
+            self._timer.start()
+        else:
+            self._timer.stop()
+        self._apply()
+
+    def _on_blink_tick(self) -> None:
+        if self._state != self.BLINK:
+            self._timer.stop()
+            return
+        self._blink_phase = not self._blink_phase
+        self._apply()
+
+    def _apply(self) -> None:
+        if self._state == self.ON:
+            self.dot.setStyleSheet(f"color:{self._color_on}; font-size:16px;")
+            return
+
+        if self._state == self.BLINK:
+            # alterne entre ON et OFF visuellement
+            if self._blink_phase:
+                self.dot.setStyleSheet(f"color:{self._color_blink}; font-size:16px;")
+            else:
+                self.dot.setStyleSheet("color:#222; font-size:16px;")
+            return
+
+        self.dot.setStyleSheet("color:#222; font-size:16px;")
+
+
+class Lamp(QFrame):
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
-        self._state: int = self.STATE_OFF
+        self._on = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(34)
@@ -50,52 +127,22 @@ class Lamp(QFrame):
         )
         layout.addWidget(self.badge)
 
-    @staticmethod
-    def _clamp_state(state: int) -> int:
-        try:
-            v = int(state)
-        except Exception:
-            v = 0
-        return 0 if v < 0 else 2 if v > 2 else v
-
-    def set_state(
-        self,
-        state: int,
-        *,
-        color_on: str = "#00FFD0",
-        color_blink: str = "#FFC000",
-    ) -> None:
-        s = self._clamp_state(state)
-        self._state = s
-
-        if s == self.STATE_ON:
+    def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
+        self._on = bool(state)
+        if self._on:
             self.dot.setStyleSheet(f"color:{color_on}; font-size:14px;")
             self.badge.setText("ON")
             self.badge.setStyleSheet(
                 f"background:{color_on}; border:none; border-radius:10px; "
                 "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
-            return
-
-        if s == self.STATE_BLINK:
-            self.dot.setStyleSheet(f"color:{color_blink}; font-size:14px;")
-            self.badge.setText("BLNK")
+        else:
+            self.dot.setStyleSheet("color:#222; font-size:14px;")
+            self.badge.setText("OFF")
             self.badge.setStyleSheet(
-                f"background:{color_blink}; border:none; border-radius:10px; "
-                "color:#000; font-family:Orbitron; font-weight:bold; font-size:9px;"
+                "background:#111; border:1px solid #222; border-radius:10px; "
+                "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
             )
-            return
-
-        # OFF
-        self.dot.setStyleSheet("color:#222; font-size:14px;")
-        self.badge.setText("OFF")
-        self.badge.setStyleSheet(
-            "background:#111; border:1px solid #222; border-radius:10px; "
-            "color:#666; font-family:Orbitron; font-weight:bold; font-size:9px;"
-        )
-
-    def set_on(self, state: bool, color_on: str = "#00FFD0") -> None:
-        self.set_state(self.STATE_ON if bool(state) else self.STATE_OFF, color_on=color_on)
 
 
 class AlertLamp(Lamp):
@@ -134,10 +181,16 @@ class ExpertPage(QWidget):
         self._overlay_host = None
         self._host_filter_installed = False
 
+        # Charger LED state cache
+        self._charger_plugged = False
+
         self._build_main()
         self._build_overlay()
         self._connect_signals()
 
+    # -----------------
+    # MAIN SCREEN (card + charger box)
+    # -----------------
     def _build_main(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
@@ -150,14 +203,71 @@ class ExpertPage(QWidget):
         self.card.clicked.connect(self.show_overlay)
         row.addWidget(self.card)
 
-        spacer = QFrame(self)
-        spacer.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        spacer.setStyleSheet("QFrame { background:#060606; border:1px dashed #222; border-radius:16px; }")
-        row.addWidget(spacer, 1)
+        # ---- Charger box (ici, pas dans l'overlay BMS)
+        self.charger_box = QFrame(self)
+        self.charger_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.charger_box.setStyleSheet("QFrame { background:#060606; border:1px solid #222; border-radius:16px; }")
+
+        cb = QVBoxLayout(self.charger_box)
+        cb.setContentsMargins(14, 12, 14, 12)
+        cb.setSpacing(10)
+
+        title = QLabel("CHARGER (SKYLLA TG)")
+        title.setStyleSheet("color: cyan; font-family: Orbitron; font-size: 11px; font-weight: bold;")
+        cb.addWidget(title)
+
+        self.lbl_plug = QLabel("PLUG: --")
+        self.lbl_plug.setStyleSheet("color:#777; font-family:Orbitron; font-size:9px; font-weight:bold;")
+        cb.addWidget(self.lbl_plug)
+
+        leds = QHBoxLayout()
+        leds.setSpacing(14)
+
+        self.led_on = LedIndicator("ON", color_on="#00FFD0", color_blink="#FFC000")
+        self.led_boost = LedIndicator("BOOST", color_on="#00FFD0", color_blink="#FFC000")
+        self.led_equalize = LedIndicator("EQUALIZE", color_on="#00FFD0", color_blink="#FFC000")
+        self.led_float = LedIndicator("FLOAT", color_on="#00FFD0", color_blink="#FFC000")
+        self.led_failure = LedIndicator("FAILURE", color_on="#FF4040", color_blink="#FF4040")
+
+        leds.addWidget(self.led_on)
+        leds.addWidget(self.led_boost)
+        leds.addWidget(self.led_equalize)
+        leds.addWidget(self.led_float)
+        leds.addWidget(self.led_failure)
+        leds.addStretch(1)
+
+        cb.addLayout(leds)
+
+        vals = QHBoxLayout()
+        vals.setSpacing(10)
+
+        k1 = QLabel("VBAT")
+        k1.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
+        self.lbl_vbat = QLabel("--.- V")
+        self.lbl_vbat.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:12px; font-weight:bold;")
+
+        k2 = QLabel("IBAT")
+        k2.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
+        self.lbl_ibat = QLabel("--.- A")
+        self.lbl_ibat.setStyleSheet("color:#EEE; font-family:Orbitron; font-size:12px; font-weight:bold;")
+
+        vals.addWidget(k1)
+        vals.addWidget(self.lbl_vbat)
+        vals.addSpacing(18)
+        vals.addWidget(k2)
+        vals.addWidget(self.lbl_ibat)
+        vals.addStretch(1)
+
+        cb.addLayout(vals)
+
+        row.addWidget(self.charger_box, 1)
 
         layout.addLayout(row)
         layout.addStretch(1)
 
+    # -----------------
+    # OVERLAY BMS (cells, mosfets, diag) - inchangé
+    # -----------------
     def _build_overlay(self) -> None:
         self.overlay = QFrame(self)
         self.overlay.hide()
@@ -247,7 +357,6 @@ class ExpertPage(QWidget):
         mos_l.addWidget(self.lamp_charge)
         mos_l.addWidget(self.lamp_discharge)
 
-        # --- NEW: manual control buttons ---
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
 
@@ -272,7 +381,6 @@ class ExpertPage(QWidget):
         btn_row.addWidget(self.btn_discharge_toggle)
 
         mos_l.addLayout(btn_row)
-
         right.addWidget(mos_panel)
 
         # REAL-TIME DATA
@@ -302,32 +410,10 @@ class ExpertPage(QWidget):
         self.val_t1 = make_kv_row("Temp Sonde 1", "0 °C")
         self.val_t2 = make_kv_row("Temp Sonde 2", "0 °C")
         self.val_tmos = make_kv_row("Temp MOSFET", "0 °C")
-
         right.addWidget(rt_panel)
-        # CHARGER STATUS (Skylla TG)
-        ch_panel, ch_l = make_panel("CHARGER (SKYLLA TG)")
-
-        self.lbl_charger_plug = QLabel("PLUG: --")
-        self.lbl_charger_plug.setStyleSheet("color:#AAA; font-family:Orbitron; font-size:9px;")
-        ch_l.addWidget(self.lbl_charger_plug)
-
-        self.ch_on = Lamp("ON")
-        self.ch_boost = Lamp("BOOST")
-        self.ch_equalize = Lamp("EQUALIZE")
-        self.ch_float = Lamp("FLOAT")
-        self.ch_failure = Lamp("FAILURE")
-
-        ch_l.addWidget(self.ch_on)
-        ch_l.addWidget(self.ch_boost)
-        ch_l.addWidget(self.ch_equalize)
-        ch_l.addWidget(self.ch_float)
-        ch_l.addWidget(self.ch_failure)
-
-        right.addWidget(ch_panel)
 
         # BMS DIAGNOSTIC
         diag_panel, diag_l = make_panel("BMS DIAGNOSTIC")
-
         self.lbl_mask = QLabel("STATUS: 0x0000")
         self.lbl_mask.setStyleSheet("color:#DDD; font-family:Orbitron; font-size:11px; font-weight:bold;")
         diag_l.addWidget(self.lbl_mask)
@@ -335,7 +421,6 @@ class ExpertPage(QWidget):
         self.al_ov = AlertLamp("OV (Overvoltage)")
         self.al_ot = AlertLamp("OT (Overtemp)")
         self.al_sc = AlertLamp("SC (Short-circuit)")
-
         diag_l.addWidget(self.al_ov)
         diag_l.addWidget(self.al_ot)
         diag_l.addWidget(self.al_sc)
@@ -390,7 +475,6 @@ class ExpertPage(QWidget):
     # Manual toggle handlers
     # -----------------
     def _toggle_charge_mos(self) -> None:
-        # invert last known state
         self.store.request_set_charge_mosfet(not self._charge_on)
 
     def _toggle_discharge_mos(self) -> None:
@@ -417,10 +501,11 @@ class ExpertPage(QWidget):
             self.store.temp_sensor_2_changed.connect(self._on_t2)
         if hasattr(self.store, "temp_mosfet_changed"):
             self.store.temp_mosfet_changed.connect(self._on_tmos)
-        # Charger (Skylla TG) - simulé pour l'instant
-        if hasattr(self.store, "charger_connected_changed") and hasattr(self, "lbl_charger_plug"):
+
+        # Charger (simu pour l'instant)
+        if hasattr(self.store, "charger_connected_changed"):
             self.store.charger_connected_changed.connect(self._on_charger_connected)
-        if hasattr(self.store, "charger_leds_changed") and hasattr(self, "ch_on"):
+        if hasattr(self.store, "charger_leds_changed"):
             self.store.charger_leds_changed.connect(self._on_charger_leds)
 
     @Slot(float)
@@ -428,11 +513,13 @@ class ExpertPage(QWidget):
         self._vpack = float(v)
         self._recalc_power()
         self._refresh_card()
+        self.lbl_vbat.setText(f"{self._vpack:.1f} V")
 
     @Slot(float)
     def _on_current(self, a: float):
         self._current = float(a)
         self._recalc_power()
+        self.lbl_ibat.setText(f"{self._current:.1f} A")
 
     def _recalc_power(self):
         self._power_kw = (self._vpack * self._current) / 1000.0
@@ -492,21 +579,27 @@ class ExpertPage(QWidget):
 
     @Slot(bool)
     def _on_charger_connected(self, plugged: bool) -> None:
-        if plugged:
-            self.lbl_charger_plug.setText("PLUG: YES")
-            self.lbl_charger_plug.setStyleSheet("color:#00FFD0; font-family:Orbitron; font-size:9px; font-weight:bold;")
+        self._charger_plugged = bool(plugged)
+        if self._charger_plugged:
+            self.lbl_plug.setText("PLUG: YES")
+            self.lbl_plug.setStyleSheet("color:#00FFD0; font-family:Orbitron; font-size:9px; font-weight:bold;")
         else:
-            self.lbl_charger_plug.setText("PLUG: NO")
-            self.lbl_charger_plug.setStyleSheet("color:#666; font-family:Orbitron; font-size:9px; font-weight:bold;")
+            self.lbl_plug.setText("PLUG: NO")
+            self.lbl_plug.setStyleSheet("color:#777; font-family:Orbitron; font-size:9px; font-weight:bold;")
+            # reset LEDs
+            self.led_on.set_state(0)
+            self.led_boost.set_state(0)
+            self.led_equalize.set_state(0)
+            self.led_float.set_state(0)
+            self.led_failure.set_state(0)
 
     @Slot(int, int, int, int, int)
     def _on_charger_leds(self, on: int, boost: int, equalize: int, float_: int, failure: int) -> None:
-        # 0=OFF, 1=ON, 2=BLINK
-        self.ch_on.set_state(on, color_on="#00FFD0", color_blink="#FFC000")
-        self.ch_boost.set_state(boost, color_on="#00FFD0", color_blink="#FFC000")
-        self.ch_equalize.set_state(equalize, color_on="#00FFD0", color_blink="#FFC000")
-        self.ch_float.set_state(float_, color_on="#00FFD0", color_blink="#FFC000")
-        self.ch_failure.set_state(failure, color_on="#FF4040", color_blink="#FF4040")
+        self.led_on.set_state(on)
+        self.led_boost.set_state(boost)
+        self.led_equalize.set_state(equalize)
+        self.led_float.set_state(float_)
+        self.led_failure.set_state(failure)
 
     def _refresh_card(self) -> None:
         self.card.update_data(self._vpack, self._delta, self._vmin, self._vmax)

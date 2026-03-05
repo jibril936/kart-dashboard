@@ -12,8 +12,6 @@ class MockService(BaseDataService):
       - vitesse
       - température moteur
       - chargeur (Skylla TG): état de branchement + états des LEDs (on/boost/equalize/float/failure)
-
-    Aucun signal BMS ici.
     """
 
     LED_OFF = 0
@@ -53,7 +51,7 @@ class MockService(BaseDataService):
                 else:
                     phase = t % 45.0
 
-                    # Par défaut: cycle ON -> BOOST -> EQUALIZE -> FLOAT
+                    # Cycle: ON -> BOOST -> EQUALIZE -> FLOAT
                     on = self.LED_ON
                     boost = self.LED_OFF
                     equalize = self.LED_OFF
@@ -61,21 +59,15 @@ class MockService(BaseDataService):
                     failure = self.LED_OFF
 
                     if phase < 2.0:
-                        # Démarrage: LED ON clignote ~2s
                         on = self.LED_BLINK
                     elif phase < 18.0:
-                        # Boost
                         boost = self.LED_ON
                     elif phase < 28.0:
-                        # Equalize
                         equalize = self.LED_ON
                     else:
-                        # Float
                         float_ = self.LED_ON
 
-                    # Petite fenêtre "défaut" simulée:
-                    # - 38-41s : on clignote + failure ON (ex: voltage sense/câbles)
-                    # - 41-45s : failure clignote (code)
+                    # Mini fenêtre "défaut" pour tester UI
                     if 38.0 <= phase < 41.0:
                         on = self.LED_BLINK
                         boost = self.LED_OFF
