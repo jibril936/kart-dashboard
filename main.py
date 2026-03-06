@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QApplication
 
 from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
 from src.core.state_store import StateStore
+from src.core.variator_i2c_service import VariatorI2CService
 from src.main_window import MainWindow
 
 
@@ -22,6 +23,18 @@ def main() -> int:
         type=str,
         default=DEFAULT_BMS_PORT,
         help="Port série BMS (ex: /dev/ttyUSB0)",
+    )
+    parser.add_argument(
+        "--i2c-bus",
+        type=int,
+        default=1,
+        help="Bus I2C du variateur",
+    )
+    parser.add_argument(
+        "--i2c-addr",
+        type=lambda x: int(x, 0),
+        default=0x22,
+        help="Adresse I2C du variateur",
     )
 
     args = parser.parse_args()
@@ -37,6 +50,13 @@ def main() -> int:
 
     store = StateStore()
     bms_service = HardwareService(store, port=args.port)
+
+    variator_service = VariatorI2CService(
+        bus_id=args.i2c_bus,
+        address=args.i2c_addr,
+        parent=app,
+    )
+    store.variator_service = variator_service
 
     store.request_charge_mosfet.connect(
         bms_service.request_set_charge_mosfet,
@@ -56,8 +76,14 @@ def main() -> int:
         window.show()
 
     bms_service.start()
+    variator_service.start()
 
     def shutdown(*_sig_args):
+        try:
+            variator_service.stop()
+        except Exception:
+            pass
+
         try:
             bms_service.stop()
         except Exception:

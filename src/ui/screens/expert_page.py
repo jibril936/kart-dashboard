@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSlider,
     QVBoxLayout,
     QWidget,
 )
@@ -137,6 +138,7 @@ class ExpertPage(QWidget):
     def __init__(self, store, parent=None):
         super().__init__(parent)
         self.store = store
+        self.variator = getattr(store, "variator_service", None)
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
@@ -166,6 +168,11 @@ class ExpertPage(QWidget):
         self._charger_led_failure = 0
         self._charger_leds_seen = False
 
+        self._variator_connected = False
+        self._variator_speed = 0.0
+        self._variator_mode = 0
+        self._variator_brake = False
+
         self._overlay_host = None
         self._host_filter_installed = False
 
@@ -175,6 +182,7 @@ class ExpertPage(QWidget):
         self._refresh_bms_card()
         self._refresh_charger_card()
         self._refresh_bms_overlay()
+        self._refresh_variator_card()
 
     def _make_card(self, title: str) -> tuple[QFrame, QVBoxLayout]:
         card = QFrame(self)
@@ -264,6 +272,42 @@ class ExpertPage(QWidget):
         top.addWidget(self.charger_card, 1)
         root.addLayout(top)
 
+        self.variator_card, var_l = self._make_card("VARIATEUR I2C")
+
+        status_row = QHBoxLayout()
+        status_row.setSpacing(8)
+
+        self.lbl_var_state = QLabel("OFFLINE")
+        self.lbl_var_state.setObjectName("ValueBig")
+        status_row.addWidget(self.lbl_var_state)
+
+        status_row.addStretch(1)
+
+        self.lbl_var_mode = QLabel("MANUAL")
+        self.lbl_var_mode.setObjectName("Value")
+        status_row.addWidget(self.lbl_var_mode)
+
+        var_l.addLayout(status_row)
+
+        self.lbl_var_hint = QLabel("Commande vitesse cible via I2C")
+        self.lbl_var_hint.setObjectName("Hint")
+        var_l.addWidget(self.lbl_var_hint)
+
+        self.slider_target = QSlider(Qt.Orientation.Horizontal)
+        self.slider_target.setRange(0, 60)
+        self.slider_target.setValue(0)
+        self.slider_target.valueChanged.connect(self._on_slider_changed)
+        var_l.addWidget(self.slider_target)
+
+        row, self.val_var_target = self._kv("Target", "0 km/h")
+        var_l.addLayout(row)
+        row, self.val_var_speed = self._kv("Measured speed", "0.0 km/h")
+        var_l.addLayout(row)
+        row, self.val_var_brake = self._kv("Brake", "OFF")
+        var_l.addLayout(row)
+
+        root.addWidget(self.variator_card)
+
         hint = QLabel("BMS Health ouvre toutes les données BMS, y compris l’état MOSFET.")
         hint.setObjectName("Hint")
         root.addWidget(hint)
@@ -300,7 +344,6 @@ class ExpertPage(QWidget):
 
         root.addWidget(header)
 
-        # scroll pour éviter que des infos soient cachées
         scroll = QScrollArea(self.overlay)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -310,7 +353,6 @@ class ExpertPage(QWidget):
         content.setContentsMargins(0, 0, 0, 0)
         content.setSpacing(10)
 
-        # colonne gauche
         left_col = QVBoxLayout()
         left_col.setSpacing(10)
 
@@ -368,7 +410,6 @@ class ExpertPage(QWidget):
 
         content.addLayout(left_col, 1)
 
-        # colonne centre
         center_col = QVBoxLayout()
         center_col.setSpacing(10)
 
@@ -399,7 +440,6 @@ class ExpertPage(QWidget):
 
         content.addLayout(center_col, 2)
 
-        # colonne droite
         right_col = QVBoxLayout()
         right_col.setSpacing(10)
 
@@ -498,6 +538,10 @@ class ExpertPage(QWidget):
             self.store.charger_connected_changed.connect(self._on_charger_connected)
         if hasattr(self.store, "charger_leds_changed"):
             self.store.charger_leds_changed.connect(self._on_charger_leds)
+
+        if self.variator is not None:
+            self.variator.telemetry_received.connect(self._on_variator_telemetry)
+            self.variator.connection_changed.connect(self._on_variator_connection)
 
     def _recalc_powers(self) -> None:
         self._power_kw = (self._vpack * self._current) / 1000.0
@@ -606,6 +650,21 @@ class ExpertPage(QWidget):
         self.ov_charger_source.setText(source)
         self.ov_charger_stage.setText(stage)
 
+    def _refresh_variator_card(self) -> None:
+        self.lbl_var_state.setText("ONLINE" if self._variator_connected else "OFFLINE")
+        self.lbl_var_mode.setText("AUTO" if self._variator_mode == 1 else "MANUAL")
+        self.val_var_target.setText(f"{self.slider_target.value()} km/h")
+        self.val_var_speed.setText(f"{self._variator_speed:.1f} km/h")
+        self.val_var_brake.setText("ON" if self._variator_brake else "OFF")
+        self.lbl_var_hint.setText("Commande vitesse cible via I2C" if self._variator_connected else "Attente liaison I2C")
+
+    @Slot(int)
+    def _on_slider_changed(self, value: int):
+        if self.variator is not None:
+            mode = 1 if int(value) > 0 else 0
+            self.variator.set_command(mode, int(value))
+        self._refresh_variator_card()
+
     @Slot(float)
     def _on_vpack(self, v: float):
         self._vpack = float(v)
@@ -709,3 +768,15 @@ class ExpertPage(QWidget):
         self._charger_led_float = int(float_led)
         self._charger_led_failure = int(failure)
         self._refresh_charger_card()
+
+    @Slot(float, int, bool)
+    def _on_variator_telemetry(self, vitesse_kmh: float, mode: int, frein: bool):
+        self._variator_speed = float(vitesse_kmh)
+        self._variator_mode = int(mode)
+        self._variator_brake = bool(frein)
+        self._refresh_variator_card()
+
+    @Slot(bool)
+    def _on_variator_connection(self, connected: bool):
+        self._variator_connected = bool(connected)
+        self._refresh_variator_card()
