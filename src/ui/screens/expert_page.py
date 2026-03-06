@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from qtpy.QtCore import QEvent, Qt, Slot
 from qtpy.QtWidgets import (
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -23,7 +24,6 @@ class Lamp(QFrame):
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(34)
-
         self.setObjectName("StatusLamp")
         if kind:
             self.setProperty("kind", kind)
@@ -52,11 +52,33 @@ class Lamp(QFrame):
 
     def set_on(self, state: bool) -> None:
         self._on = bool(state)
-        self.setProperty("state", "on" if self._on else "off")
         self.badge.setText("ON" if self._on else "OFF")
 
-        self.style().unpolish(self)
-        self.style().polish(self)
+        if self._on:
+            dot_color = "#22c55e"
+            badge_bg = "#12351f"
+            badge_fg = "#9df5b5"
+            border = "#2b6d40"
+        else:
+            dot_color = "#555555"
+            badge_bg = "#1e1e1e"
+            badge_fg = "#8a8a8a"
+            border = "#3a3a3a"
+
+        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 18px;")
+        self.badge.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {badge_bg};
+                color: {badge_fg};
+                border: 1px solid {border};
+                border-radius: 6px;
+                font-weight: 700;
+                padding: 0 4px;
+            }}
+            """
+        )
+
         self.update()
 
     @property
@@ -79,14 +101,13 @@ class LedPill(QFrame):
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("StatusLamp")
-        self.setFixedHeight(34)
+        self.setFixedHeight(32)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(6)
 
         self.dot = QLabel("●")
-        self.dot.setObjectName("LampDot")
         layout.addWidget(self.dot)
 
         self.lbl_title = QLabel(title)
@@ -96,9 +117,8 @@ class LedPill(QFrame):
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedSize(56, 22)
+        self.badge.setFixedSize(54, 20)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.badge.setObjectName("LampBadge")
         layout.addWidget(self.badge)
 
         self.set_state(0)
@@ -114,19 +134,38 @@ class LedPill(QFrame):
 
         if state == 0:
             text = "OFF"
-            prop = "off"
+            dot_color = "#555555"
+            badge_bg = "#1e1e1e"
+            badge_fg = "#8a8a8a"
+            border = "#3a3a3a"
         elif state == 1:
             text = "ON"
-            prop = "on"
+            dot_color = "#22c55e"
+            badge_bg = "#12351f"
+            badge_fg = "#9df5b5"
+            border = "#2b6d40"
         else:
             text = "BLINK"
-            prop = "blink"
+            dot_color = "#f59e0b"
+            badge_bg = "#3a2a08"
+            badge_fg = "#ffd27a"
+            border = "#8b6914"
 
-        self.setProperty("state", prop)
         self.badge.setText(text)
-
-        self.style().unpolish(self)
-        self.style().polish(self)
+        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 16px;")
+        self.badge.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {badge_bg};
+                color: {badge_fg};
+                border: 1px solid {border};
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                padding: 0 4px;
+            }}
+            """
+        )
         self.update()
 
 
@@ -206,11 +245,13 @@ class ExpertPage(QWidget):
 
         k = QLabel(key)
         k.setObjectName("Muted")
+        k.setStyleSheet("font-size: 11px;")
 
         val = QLabel(initial)
         val.setObjectName("Value")
         val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         val.setMinimumWidth(90)
+        val.setStyleSheet("font-size: 12px;")
 
         row.addWidget(k)
         row.addStretch(1)
@@ -230,21 +271,23 @@ class ExpertPage(QWidget):
         top.addWidget(self.card_bms, 1)
 
         self.charger_card, charger_l = self._make_card("CHARGEUR")
-        self.charger_card.setMinimumWidth(320)
+        self.charger_card.setMinimumWidth(360)
 
         self.lbl_charger_state = QLabel("OFFLINE")
-        self.lbl_charger_state.setObjectName("ValueBig")
+        self.lbl_charger_state.setObjectName("Value")
         self.lbl_charger_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_charger_state.setStyleSheet("font-size: 18px; font-weight: 700;")
         charger_l.addWidget(self.lbl_charger_state)
 
         self.lbl_charger_hint = QLabel("Bloc chargeur homogène type Skylla")
         self.lbl_charger_hint.setObjectName("Hint")
+        self.lbl_charger_hint.setStyleSheet("font-size: 11px;")
         charger_l.addWidget(self.lbl_charger_hint)
 
         led_grid = QGridLayout()
         led_grid.setContentsMargins(0, 4, 0, 4)
-        led_grid.setHorizontalSpacing(8)
-        led_grid.setVerticalSpacing(8)
+        led_grid.setHorizontalSpacing(6)
+        led_grid.setVerticalSpacing(6)
 
         self.led_on = LedPill("ON")
         self.led_boost = LedPill("BOOST")
@@ -274,23 +317,28 @@ class ExpertPage(QWidget):
 
         self.variator_card, var_l = self._make_card("VARIATEUR I2C")
 
-        status_row = QHBoxLayout()
-        status_row.setSpacing(8)
+        row_top = QHBoxLayout()
+        row_top.setSpacing(8)
 
         self.lbl_var_state = QLabel("OFFLINE")
-        self.lbl_var_state.setObjectName("ValueBig")
-        status_row.addWidget(self.lbl_var_state)
+        self.lbl_var_state.setObjectName("Value")
+        self.lbl_var_state.setStyleSheet("font-size: 18px; font-weight: 700;")
+        row_top.addWidget(self.lbl_var_state)
 
-        status_row.addStretch(1)
+        row_top.addStretch(1)
 
-        self.lbl_var_mode = QLabel("MANUAL")
-        self.lbl_var_mode.setObjectName("Value")
-        status_row.addWidget(self.lbl_var_mode)
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("MANUAL", 0)
+        self.mode_combo.addItem("AUTO", 1)
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        self.mode_combo.setFixedWidth(120)
+        row_top.addWidget(self.mode_combo)
 
-        var_l.addLayout(status_row)
+        var_l.addLayout(row_top)
 
-        self.lbl_var_hint = QLabel("Commande vitesse cible via I2C")
+        self.lbl_var_hint = QLabel("Commande I2C : mode + vitesse cible")
         self.lbl_var_hint.setObjectName("Hint")
+        self.lbl_var_hint.setStyleSheet("font-size: 11px;")
         var_l.addWidget(self.lbl_var_hint)
 
         self.slider_target = QSlider(Qt.Orientation.Horizontal)
@@ -310,6 +358,7 @@ class ExpertPage(QWidget):
 
         hint = QLabel("BMS Health ouvre toutes les données BMS, y compris l’état MOSFET.")
         hint.setObjectName("Hint")
+        hint.setStyleSheet("font-size: 11px;")
         root.addWidget(hint)
         root.addStretch(1)
 
@@ -650,20 +699,31 @@ class ExpertPage(QWidget):
         self.ov_charger_source.setText(source)
         self.ov_charger_stage.setText(stage)
 
+    def _current_mode_value(self) -> int:
+        return int(self.mode_combo.currentData())
+
+    def _send_variator_command(self):
+        if self.variator is None:
+            return
+        self.variator.set_command(self._current_mode_value(), int(self.slider_target.value()))
+
     def _refresh_variator_card(self) -> None:
         self.lbl_var_state.setText("ONLINE" if self._variator_connected else "OFFLINE")
-        self.lbl_var_mode.setText("AUTO" if self._variator_mode == 1 else "MANUAL")
         self.val_var_target.setText(f"{self.slider_target.value()} km/h")
         self.val_var_speed.setText(f"{self._variator_speed:.1f} km/h")
         self.val_var_brake.setText("ON" if self._variator_brake else "OFF")
-        self.lbl_var_hint.setText("Commande vitesse cible via I2C" if self._variator_connected else "Attente liaison I2C")
+        self.lbl_var_hint.setText(
+            "Commande I2C : mode + vitesse cible" if self._variator_connected else "Attente liaison I2C"
+        )
 
     @Slot(int)
-    def _on_slider_changed(self, value: int):
-        if self.variator is not None:
-            mode = 1 if int(value) > 0 else 0
-            self.variator.set_command(mode, int(value))
+    def _on_slider_changed(self, _value: int):
+        self._send_variator_command()
         self._refresh_variator_card()
+
+    @Slot(int)
+    def _on_mode_changed(self, _index: int):
+        self._send_variator_command()
 
     @Slot(float)
     def _on_vpack(self, v: float):
@@ -774,6 +834,13 @@ class ExpertPage(QWidget):
         self._variator_speed = float(vitesse_kmh)
         self._variator_mode = int(mode)
         self._variator_brake = bool(frein)
+
+        combo_index = self.mode_combo.findData(self._variator_mode)
+        if combo_index >= 0 and combo_index != self.mode_combo.currentIndex():
+            self.mode_combo.blockSignals(True)
+            self.mode_combo.setCurrentIndex(combo_index)
+            self.mode_combo.blockSignals(False)
+
         self._refresh_variator_card()
 
     @Slot(bool)

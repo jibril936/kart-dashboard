@@ -58,10 +58,8 @@ class VariatorI2CService(QObject):
         self._set_connected(False)
 
     def set_command(self, mode: int, target_speed: int):
-        mode = 1 if int(mode) else 0
-        target_speed = max(0, min(255, int(target_speed)))
-        self._mode = mode
-        self._target_speed = target_speed
+        self._mode = 1 if int(mode) else 0
+        self._target_speed = max(0, min(255, int(target_speed)))
 
     def _set_connected(self, state: bool):
         state = bool(state)
@@ -80,14 +78,13 @@ class VariatorI2CService(QObject):
             return
 
         try:
-            # Pi -> ATmega : 2 octets [mode, vitesseCible]
+            # Pi -> ATmega : [mode, vitesseCible]
             write_msg = i2c_msg.write(self.address, [self._mode, self._target_speed])
             self._bus.i2c_rdwr(write_msg)
 
-            # petite pause pour laisser la carte mettre à jour la télémétrie
             time.sleep(0.001)
 
-            # ATmega -> Pi : 6 octets [float vitesse][uint8 mode][uint8 frein]
+            # ATmega -> Pi : float vitesse + uint8 mode + uint8 frein
             read_msg = i2c_msg.read(self.address, 6)
             self._bus.i2c_rdwr(read_msg)
             raw = bytes(read_msg)
@@ -96,7 +93,7 @@ class VariatorI2CService(QObject):
                 raise ValueError(f"taille télémétrie invalide: {len(raw)}")
 
             vitesse, mode, frein = struct.unpack("<fBB", raw)
-    
+
             self._set_connected(True)
             self._set_error("")
             self.telemetry_received.emit(float(vitesse), int(mode), bool(frein))
