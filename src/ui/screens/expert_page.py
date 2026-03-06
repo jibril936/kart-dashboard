@@ -211,6 +211,7 @@ class ExpertPage(QWidget):
         self._variator_speed = 0.0
         self._variator_mode = 0
         self._variator_brake = False
+        self._selected_mode = 0
 
         self._overlay_host = None
         self._host_filter_installed = False
@@ -352,6 +353,8 @@ class ExpertPage(QWidget):
         row, self.val_var_speed = self._kv("Measured speed", "0.0 km/h")
         var_l.addLayout(row)
         row, self.val_var_brake = self._kv("Brake", "OFF")
+        var_l.addLayout(row)
+        row, self.val_var_feedback_mode = self._kv("Reported mode", "MANUAL")
         var_l.addLayout(row)
 
         root.addWidget(self.variator_card)
@@ -700,7 +703,19 @@ class ExpertPage(QWidget):
         self.ov_charger_stage.setText(stage)
 
     def _current_mode_value(self) -> int:
-        return int(self.mode_combo.currentData())
+        return self._selected_mode
+
+    def _apply_mode_ui_state(self) -> None:
+        auto_mode = self._selected_mode == 1
+        self.slider_target.setEnabled(auto_mode)
+        if auto_mode:
+            self.lbl_var_hint.setText(
+                "Commande I2C : mode + vitesse cible" if self._variator_connected else "Attente liaison I2C"
+            )
+        else:
+            self.lbl_var_hint.setText(
+                "Mode manuel : slider désactivé" if self._variator_connected else "Mode manuel : attente liaison I2C"
+            )
 
     def _send_variator_command(self):
         if self.variator is None:
@@ -712,9 +727,8 @@ class ExpertPage(QWidget):
         self.val_var_target.setText(f"{self.slider_target.value()} km/h")
         self.val_var_speed.setText(f"{self._variator_speed:.1f} km/h")
         self.val_var_brake.setText("ON" if self._variator_brake else "OFF")
-        self.lbl_var_hint.setText(
-            "Commande I2C : mode + vitesse cible" if self._variator_connected else "Attente liaison I2C"
-        )
+        self.val_var_feedback_mode.setText("AUTO" if self._variator_mode == 1 else "MANUAL")
+        self._apply_mode_ui_state()
 
     @Slot(int)
     def _on_slider_changed(self, _value: int):
@@ -722,8 +736,10 @@ class ExpertPage(QWidget):
         self._refresh_variator_card()
 
     @Slot(int)
-    def _on_mode_changed(self, _index: int):
+    def _on_mode_changed(self, index: int):
+        self._selected_mode = int(self.mode_combo.itemData(index))
         self._send_variator_command()
+        self._refresh_variator_card()
 
     @Slot(float)
     def _on_vpack(self, v: float):
@@ -834,13 +850,6 @@ class ExpertPage(QWidget):
         self._variator_speed = float(vitesse_kmh)
         self._variator_mode = int(mode)
         self._variator_brake = bool(frein)
-
-        combo_index = self.mode_combo.findData(self._variator_mode)
-        if combo_index >= 0 and combo_index != self.mode_combo.currentIndex():
-            self.mode_combo.blockSignals(True)
-            self.mode_combo.setCurrentIndex(combo_index)
-            self.mode_combo.blockSignals(False)
-
         self._refresh_variator_card()
 
     @Slot(bool)
