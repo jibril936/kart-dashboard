@@ -7,6 +7,7 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -15,8 +16,6 @@ from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
 class Lamp(QFrame):
-    """Lampe ON/OFF stylée par QSS via properties (state/kind)."""
-
     def __init__(self, title: str, parent=None, kind: str | None = None):
         super().__init__(parent)
         self._on = False
@@ -43,7 +42,7 @@ class Lamp(QFrame):
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedSize(44, 22)
+        self.badge.setFixedSize(52, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setObjectName("LampBadge")
         layout.addWidget(self.badge)
@@ -59,6 +58,10 @@ class Lamp(QFrame):
         self.style().polish(self)
         self.update()
 
+    @property
+    def is_on(self) -> bool:
+        return self._on
+
 
 class AlertLamp(Lamp):
     def __init__(self, title: str, parent=None):
@@ -69,13 +72,6 @@ class AlertLamp(Lamp):
 
 
 class LedPill(QFrame):
-    """
-    Etat type Skylla :
-    0 = OFF
-    1 = ON
-    2 = BLINK
-    """
-
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self._state = 0
@@ -99,7 +95,7 @@ class LedPill(QFrame):
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedSize(52, 22)
+        self.badge.setFixedSize(56, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setObjectName("LampBadge")
         layout.addWidget(self.badge)
@@ -186,8 +182,8 @@ class ExpertPage(QWidget):
         card.setObjectName("Card")
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(14, 12, 14, 12)
-        v.setSpacing(8)
+        v.setContentsMargins(12, 10, 12, 10)
+        v.setSpacing(6)
 
         t = QLabel(title)
         t.setObjectName("CardTitle")
@@ -206,7 +202,7 @@ class ExpertPage(QWidget):
         val = QLabel(initial)
         val.setObjectName("Value")
         val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        val.setMinimumWidth(100)
+        val.setMinimumWidth(90)
 
         row.addWidget(k)
         row.addStretch(1)
@@ -215,25 +211,25 @@ class ExpertPage(QWidget):
 
     def _build_main(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
 
         top = QHBoxLayout()
-        top.setSpacing(12)
+        top.setSpacing(10)
 
         self.card_bms = BMSSummaryCard(self)
         self.card_bms.clicked.connect(self.show_overlay)
         top.addWidget(self.card_bms, 1)
 
         self.charger_card, charger_l = self._make_card("CHARGEUR")
-        self.charger_card.setMinimumWidth(360)
+        self.charger_card.setMinimumWidth(320)
 
         self.lbl_charger_state = QLabel("OFFLINE")
         self.lbl_charger_state.setObjectName("ValueBig")
         self.lbl_charger_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         charger_l.addWidget(self.lbl_charger_state)
 
-        self.lbl_charger_hint = QLabel("Affichage chargeur homogène type Skylla")
+        self.lbl_charger_hint = QLabel("Bloc chargeur homogène type Skylla")
         self.lbl_charger_hint.setObjectName("Hint")
         charger_l.addWidget(self.lbl_charger_hint)
 
@@ -268,9 +264,9 @@ class ExpertPage(QWidget):
         top.addWidget(self.charger_card, 1)
         root.addLayout(top)
 
-        bottom_hint = QLabel("BMS Health ouvre maintenant toutes les données BMS détaillées.")
-        bottom_hint.setObjectName("Hint")
-        root.addWidget(bottom_hint)
+        hint = QLabel("BMS Health ouvre toutes les données BMS, y compris l’état MOSFET.")
+        hint.setObjectName("Hint")
+        root.addWidget(hint)
         root.addStretch(1)
 
     def _build_overlay(self) -> None:
@@ -280,7 +276,7 @@ class ExpertPage(QWidget):
         self.overlay.setObjectName("Overlay")
 
         root = QVBoxLayout(self.overlay)
-        root.setContentsMargins(10, 8, 10, 8)
+        root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(8)
 
         header = QFrame(self.overlay)
@@ -290,7 +286,6 @@ class ExpertPage(QWidget):
 
         hl = QHBoxLayout(header)
         hl.setContentsMargins(12, 6, 12, 6)
-        hl.setSpacing(10)
 
         title = QLabel("BMS HEALTH")
         title.setObjectName("CardTitle")
@@ -305,9 +300,17 @@ class ExpertPage(QWidget):
 
         root.addWidget(header)
 
-        content = QHBoxLayout()
+        # scroll pour éviter que des infos soient cachées
+        scroll = QScrollArea(self.overlay)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        scroll_content = QWidget()
+        content = QHBoxLayout(scroll_content)
+        content.setContentsMargins(0, 0, 0, 0)
         content.setSpacing(10)
 
+        # colonne gauche
         left_col = QVBoxLayout()
         left_col.setSpacing(10)
 
@@ -346,15 +349,15 @@ class ExpertPage(QWidget):
         mos_l.addWidget(self.lamp_discharge)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
+        btn_row.setSpacing(8)
 
-        self.btn_charge_toggle = QPushButton("TOGGLE CHARGE")
-        self.btn_charge_toggle.setFixedHeight(30)
+        self.btn_charge_toggle = QPushButton()
+        self.btn_charge_toggle.setFixedHeight(32)
         self.btn_charge_toggle.clicked.connect(self._toggle_charge_mos)
         btn_row.addWidget(self.btn_charge_toggle)
 
-        self.btn_discharge_toggle = QPushButton("TOGGLE DISCH")
-        self.btn_discharge_toggle.setFixedHeight(30)
+        self.btn_discharge_toggle = QPushButton()
+        self.btn_discharge_toggle.setFixedHeight(32)
         self.btn_discharge_toggle.setProperty("variant", "danger")
         self.btn_discharge_toggle.clicked.connect(self._toggle_discharge_mos)
         btn_row.addWidget(self.btn_discharge_toggle)
@@ -365,14 +368,15 @@ class ExpertPage(QWidget):
 
         content.addLayout(left_col, 1)
 
+        # colonne centre
         center_col = QVBoxLayout()
         center_col.setSpacing(10)
 
         cells_card, cells_l = self._make_card("CELL VOLTAGES")
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
 
         self.cell_widgets = []
         for i in range(16):
@@ -395,6 +399,7 @@ class ExpertPage(QWidget):
 
         content.addLayout(center_col, 2)
 
+        # colonne droite
         right_col = QVBoxLayout()
         right_col.setSpacing(10)
 
@@ -423,7 +428,8 @@ class ExpertPage(QWidget):
         right_col.addStretch(1)
         content.addLayout(right_col, 1)
 
-        root.addLayout(content, 1)
+        scroll.setWidget(scroll_content)
+        root.addWidget(scroll, 1)
 
     def _ensure_overlay_host(self) -> None:
         host = self.window()
@@ -443,9 +449,8 @@ class ExpertPage(QWidget):
             self._sync_overlay_geometry()
 
     def _sync_overlay_geometry(self) -> None:
-        if self._overlay_host is None:
-            return
-        self.overlay.setGeometry(self._overlay_host.rect())
+        if self._overlay_host is not None:
+            self.overlay.setGeometry(self._overlay_host.rect())
 
     def eventFilter(self, obj, event):
         if obj is self._overlay_host and event.type() == QEvent.Type.Resize:
@@ -496,10 +501,6 @@ class ExpertPage(QWidget):
 
     def _recalc_powers(self) -> None:
         self._power_kw = (self._vpack * self._current) / 1000.0
-
-        # Convention UI :
-        # - traction / accélération => positif
-        # - charge => positif dans le bloc chargeur
         self._traction_kw = max(0.0, -self._power_kw)
         self._charge_kw = max(0.0, self._power_kw)
 
@@ -538,6 +539,10 @@ class ExpertPage(QWidget):
     def _refresh_bms_card(self) -> None:
         self.card_bms.update_data(self._vpack, self._delta, self._vmin, self._vmax)
 
+    def _refresh_mosfet_buttons(self) -> None:
+        self.btn_charge_toggle.setText("TURN CHARGE OFF" if self._charge_on else "TURN CHARGE ON")
+        self.btn_discharge_toggle.setText("TURN DISCH OFF" if self._discharge_on else "TURN DISCH ON")
+
     def _refresh_bms_overlay(self) -> None:
         self.ov_soc.setText(f"{self._soc:d} %")
         self.ov_vpack.setText(f"{self._vpack:.1f} V")
@@ -558,6 +563,7 @@ class ExpertPage(QWidget):
 
         self.lamp_charge.set_on(self._charge_on)
         self.lamp_discharge.set_on(self._discharge_on)
+        self._refresh_mosfet_buttons()
 
     def _refresh_charger_card(self) -> None:
         if self._charger_leds_seen:
@@ -652,13 +658,9 @@ class ExpertPage(QWidget):
 
         self.lbl_mask.setText(f"STATUS: 0x{bm:04X}")
 
-        ov = bool(bm & self.BIT_OV)
-        ot = bool(bm & self.BIT_OT)
-        sc = bool(bm & self.BIT_SC)
-
-        self.al_ov.set_alert(ov)
-        self.al_ot.set_alert(ot)
-        self.al_sc.set_alert(sc)
+        self.al_ov.set_alert(bool(bm & self.BIT_OV))
+        self.al_ot.set_alert(bool(bm & self.BIT_OT))
+        self.al_sc.set_alert(bool(bm & self.BIT_SC))
 
         self._refresh_charger_card()
 
