@@ -1,16 +1,19 @@
 import math
 
-from qtpy.QtCore import QPointF, QRectF, Qt
-from qtpy.QtGui import QColor, QFont, QPainter, QPen
+from qtpy.QtCore import QPoint, QRect, Qt, Signal
+from qtpy.QtGui import QColor, QFont, QPainter, QPen, QPolygon
 from qtpy.QtWidgets import QWidget
 
 
 class AnalogGaugeWidget(QWidget):
+    valueChanged = Signal(int)
+
     def __init__(
         self,
         minValue=0,
         maxValue=100,
         units="",
+        gaugeColor="#00FFFF",
         scalaCount=10,
         parent=None,
     ):
@@ -18,164 +21,220 @@ class AnalogGaugeWidget(QWidget):
 
         self.minValue = float(minValue)
         self.maxValue = float(maxValue)
-        self.units = str(units)
-        self.scalaCount = max(2, int(scalaCount))
-        self.value = self.minValue
+        self.units = units
+        self.gaugeColor = QColor(gaugeColor)
+        self.value = float(minValue)
+        self.scalaCount = int(scalaCount)
+        self.subDivCount = 5
 
-        self.startAngle = 225
-        self.endAngle = -45
+        self.scale_angle_start_value = 135
+        self.scale_angle_size = 270
 
-        self.setMinimumSize(180, 180)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setMinimumSize(300, 300)
 
     def setValue(self, value):
-        value = float(value)
-        value = max(self.minValue, min(self.maxValue, value))
-        if value != self.value:
-            self.value = value
+        try:
+            val = float(value)
+            self.value = max(self.minValue, min(self.maxValue, val))
+            self.valueChanged.emit(int(self.value))
             self.update()
-
-    def _format_center_value(self):
-        abs_value = abs(self.value)
-
-        if self.units.lower() == "w":
-            return f"{int(round(self.value))}", "W"
-
-        if self.units.lower() == "kw":
-            if abs_value < 1.0:
-                return f"{int(round(self.value * 1000.0))}", "W"
-            return f"{self.value:.2f}", "kW"
-
-        return f"{self.value:.1f}", self.units
-
-    def _value_to_angle(self, value):
-        span = self.maxValue - self.minValue
-        if span <= 0:
-            return self.startAngle
-
-        ratio = (value - self.minValue) / span
-        angle = self.startAngle + ratio * (self.endAngle - self.startAngle)
-        return angle
+        except Exception:
+            pass
 
     def paintEvent(self, event):
         del event
 
-        side = min(self.width(), self.height())
-        margin = 12
-
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        painter.translate(self.width() / 2, self.height() / 2)
-        painter.scale(side / 240.0, side / 240.0)
+        w, h = self.width(), self.height()
+        self.diameter = min(w, h)
 
-        # fond
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(8, 8, 8))
-        painter.drawEllipse(QPointF(0, 0), 112, 112)
+        painter.translate(w / 2, h / 2)
 
-        # anneau externe
-        pen = QPen(QColor(60, 60, 60), 8)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        rect = QRectF(-92, -92, 184, 184)
-        painter.drawArc(rect, int((90 - self.startAngle) * 16), int(-(self.endAngle - self.startAngle) * 16))
+        self.draw_fine_ticks(painter)
+        self.draw_scale_markers(painter)
+        self.draw_scale(painter)
+        self.draw_progress(painter)
+        self.draw_needle(painter)
+        self.draw_digital_value(painter)
 
-        # graduation
-        tick_pen = QPen(QColor(190, 190, 190), 2)
-        painter.setPen(tick_pen)
-
-        for i in range(self.scalaCount + 1):
-            ratio = i / self.scalaCount
-            value = self.minValue + ratio * (self.maxValue - self.minValue)
-            angle_deg = self._value_to_angle(value)
-            angle = math.radians(angle_deg)
-
-            x1 = math.cos(angle) * 76
-            y1 = -math.sin(angle) * 76
-            x2 = math.cos(angle) * 88
-            y2 = -math.sin(angle) * 88
-            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
-
-            label = f"{int(round(value))}"
-            lx = math.cos(angle) * 62
-            ly = -math.sin(angle) * 62
-
-            font = QFont()
-            font.setPointSize(8)
-            painter.setFont(font)
-            painter.setPen(QColor(180, 180, 180))
-            painter.drawText(QRectF(lx - 16, ly - 8, 32, 16), Qt.AlignmentFlag.AlignCenter, label)
-            painter.setPen(tick_pen)
-
-        # zones traction / regen si jauge bipolaire
-        if self.minValue < 0 < self.maxValue:
-            zero_angle = self._value_to_angle(0.0)
-            pos_pen = QPen(QColor(90, 200, 120), 6)
-            neg_pen = QPen(QColor(80, 140, 220), 6)
-
-            # côté négatif
-            painter.setPen(neg_pen)
-            painter.drawArc(
-                QRectF(-84, -84, 168, 168),
-                int((90 - self.startAngle) * 16),
-                int(-(zero_angle - self.startAngle) * 16),
-            )
-
-            # côté positif
-            painter.setPen(pos_pen)
-            painter.drawArc(
-                QRectF(-84, -84, 168, 168),
-                int((90 - zero_angle) * 16),
-                int(-(self.endAngle - zero_angle) * 16),
-            )
-
-        # aiguille
-        angle_deg = self._value_to_angle(self.value)
-        angle = math.radians(angle_deg)
-
+    def draw_fine_ticks(self, painter):
         painter.save()
-        painter.rotate(-angle_deg)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(220, 60, 60))
-        points = [
-            QPointF(0, -4),
-            QPointF(72, 0),
-            QPointF(0, 4),
-            QPointF(-12, 0),
-        ]
-        painter.drawPolygon(points)
+
+        pen = QPen(QColor(80, 80, 80), 1)
+        painter.setPen(pen)
+
+        total_ticks = self.scalaCount * self.subDivCount
+        radius_outer = self.diameter / 2 - 5
+        radius_inner = self.diameter / 2 - 15
+
+        for i in range(total_ticks + 1):
+            angle = math.radians(
+                self.scale_angle_start_value + (i * self.scale_angle_size / total_ticks)
+            )
+            x1 = radius_outer * math.cos(angle)
+            y1 = radius_outer * math.sin(angle)
+            x2 = radius_inner * math.cos(angle)
+            y2 = radius_inner * math.sin(angle)
+            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+
         painter.restore()
 
-        # centre
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(26, 26, 26))
-        painter.drawEllipse(QPointF(0, 0), 12, 12)
+    def draw_scale(self, painter):
+        painter.save()
 
-        # texte central
-        value_text, unit_text = self._format_center_value()
+        pen = QPen(QColor(60, 60, 60), 2)
+        painter.setPen(pen)
 
-        font_value = QFont()
-        font_value.setPointSize(20)
-        font_value.setBold(True)
-        painter.setFont(font_value)
-        painter.setPen(QColor(245, 245, 245))
-        painter.drawText(QRectF(-60, -18, 120, 26), Qt.AlignmentFlag.AlignCenter, value_text)
+        painter.drawArc(
+            int(-self.diameter / 2 + 5),
+            int(-self.diameter / 2 + 5),
+            int(self.diameter - 10),
+            int(self.diameter - 10),
+            int(-self.scale_angle_start_value * 16),
+            int(-self.scale_angle_size * 16),
+        )
 
-        font_unit = QFont()
-        font_unit.setPointSize(9)
+        painter.restore()
+
+    def draw_progress(self, painter):
+        painter.save()
+
+        span_total = self.maxValue - self.minValue
+        if span_total <= 0:
+            painter.restore()
+            return
+
+        val_ratio = (self.value - self.minValue) / span_total
+        current_angle = self.scale_angle_start_value + (val_ratio * self.scale_angle_size)
+
+        pen_width = 8
+
+        # Jauge vitesse = cyan plein arc depuis le début
+        if self.units == "km/h":
+            color = QColor(0, 255, 255)
+            start_angle = self.scale_angle_start_value
+
+        else:
+            # Jauge puissance bipolaire :
+            # départ à zéro, négatif d'un côté, positif de l'autre
+            if self.minValue < 0 < self.maxValue:
+                zero_ratio = (0.0 - self.minValue) / span_total
+                start_angle = self.scale_angle_start_value + (zero_ratio * self.scale_angle_size)
+            else:
+                start_angle = self.scale_angle_start_value
+
+            if self.value < 0:
+                color = QColor(0, 255, 127)
+            else:
+                if self.maxValue > 0:
+                    pos_ratio = self.value / self.maxValue
+                else:
+                    pos_ratio = 0.0
+
+                if pos_ratio < 0.33:
+                    color = QColor(255, 255, 0)
+                elif pos_ratio < 0.66:
+                    color = QColor(255, 150, 0)
+                else:
+                    color = QColor(255, 50, 50)
+
+        painter.setPen(QPen(color, pen_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+        span = -(current_angle - start_angle)
+        painter.drawArc(
+            int(-self.diameter / 2 + 5),
+            int(-self.diameter / 2 + 5),
+            int(self.diameter - 10),
+            int(self.diameter - 10),
+            int(-start_angle * 16),
+            int(span * 16),
+        )
+
+        painter.restore()
+
+    def draw_digital_value(self, painter):
+        painter.save()
+
+        y_base = int(self.diameter / 6.0)
+
+        painter.setPen(QColor(255, 255, 255))
+
+        # Valeur principale
+        font_val = QFont("Orbitron", int(self.diameter * 0.14), QFont.Weight.Bold)
+        painter.setFont(font_val)
+
+        val_rect = QRect(-100, y_base - 40, 200, 60)
+
+        if self.units == "km/h":
+            text_value = f"{self.value:.0f}"
+        else:
+            text_value = f"{self.value:.0f}"
+
+        painter.drawText(val_rect, Qt.AlignmentFlag.AlignCenter, text_value)
+
+        # Unité
+        font_unit = QFont("Orbitron", int(self.diameter * 0.04), QFont.Weight.Normal)
         painter.setFont(font_unit)
-        painter.setPen(QColor(180, 180, 180))
-        painter.drawText(QRectF(-60, 12, 120, 18), Qt.AlignmentFlag.AlignCenter, unit_text)
+        painter.setPen(QColor(140, 140, 140))
 
-        # labels regen / traction si jauge bipolaire
-        if self.minValue < 0 < self.maxValue:
-            font_tag = QFont()
-            font_tag.setPointSize(8)
-            painter.setFont(font_tag)
+        unit_rect = QRect(-100, y_base + 30, 200, 30)
+        painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.units)
 
-            painter.setPen(QColor(80, 140, 220))
-            painter.drawText(QRectF(-95, 70, 60, 18), Qt.AlignmentFlag.AlignCenter, "CHARGE")
+        painter.restore()
 
-            painter.setPen(QColor(90, 200, 120))
-            painter.drawText(QRectF(35, 70, 60, 18), Qt.AlignmentFlag.AlignCenter, "POWER")
+    def draw_scale_markers(self, painter):
+        painter.save()
+
+        painter.setPen(QColor(100, 100, 100))
+        painter.setFont(QFont("Orbitron", 7))
+
+        radius = self.diameter / 2 - 45
+
+        for i in range(self.scalaCount + 1):
+            val = self.minValue + (i * (self.maxValue - self.minValue) / self.scalaCount)
+            angle = math.radians(
+                self.scale_angle_start_value + (i * self.scale_angle_size / self.scalaCount)
+            )
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+
+            if abs(val) < 0.0001:
+                label = "0"
+            else:
+                label = f"{val:.0f}"
+
+            painter.drawText(
+                QRect(int(x) - 20, int(y) - 10, 40, 20),
+                Qt.AlignmentFlag.AlignCenter,
+                label,
+            )
+
+        painter.restore()
+
+    def draw_needle(self, painter):
+        painter.save()
+
+        span_total = self.maxValue - self.minValue
+        if span_total <= 0:
+            painter.restore()
+            return
+
+        ratio = (self.value - self.minValue) / span_total
+        angle = self.scale_angle_start_value + (ratio * self.scale_angle_size)
+
+        painter.rotate(angle)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(255, 255, 255))
+
+        needle = QPolygon(
+            [
+                QPoint(int(self.diameter / 2 - 15), 0),
+                QPoint(0, 3),
+                QPoint(0, -3),
+            ]
+        )
+        painter.drawConvexPolygon(needle)
+
+        painter.restore()

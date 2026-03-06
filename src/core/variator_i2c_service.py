@@ -96,7 +96,7 @@ class VariatorI2CService(QObject):
                 raise ValueError(f"taille télémétrie invalide: {len(raw)}")
 
             vitesse, mode, frein = struct.unpack("<fBB", raw)
-
+    
             self._set_connected(True)
             self._set_error("")
             self.telemetry_received.emit(float(vitesse), int(mode), bool(frein))
