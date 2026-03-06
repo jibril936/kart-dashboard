@@ -94,6 +94,8 @@ class VariatorI2CService(QObject):
 
             vitesse, mode, frein = struct.unpack("<fBB", raw)
 
+            print(f"I2C RX -> vitesse={vitesse:.2f}, mode={mode}, frein={frein}")
+
             self._set_connected(True)
             self._set_error("")
             self.telemetry_received.emit(float(vitesse), int(mode), bool(frein))
