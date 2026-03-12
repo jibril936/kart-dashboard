@@ -7,6 +7,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtCore import Qt as QtCoreQt
 from PyQt6.QtWidgets import QApplication
 
+from src.core.borne_i2c_service import BorneI2CService
+from src.core.charger_i2c_service import ChargerI2CService
 from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
 from src.core.state_store import StateStore
 from src.core.variator_i2c_service import VariatorI2CService
@@ -24,17 +26,24 @@ def main() -> int:
         default=DEFAULT_BMS_PORT,
         help="Port série BMS (ex: /dev/ttyUSB0)",
     )
+    parser.add_argument("--i2c-bus", type=int, default=1, help="Bus I2C")
     parser.add_argument(
-        "--i2c-bus",
-        type=int,
-        default=1,
-        help="Bus I2C du variateur",
-    )
-    parser.add_argument(
-        "--i2c-addr",
+        "--variator-addr",
         type=lambda x: int(x, 0),
         default=0x22,
-        help="Adresse I2C du variateur",
+        help="Adresse I2C variateur",
+    )
+    parser.add_argument(
+        "--charger-addr",
+        type=lambda x: int(x, 0),
+        default=0x24,
+        help="Adresse I2C chargeur",
+    )
+    parser.add_argument(
+        "--borne-addr",
+        type=lambda x: int(x, 0),
+        default=0x56,
+        help="Adresse I2C borne",
     )
 
     args = parser.parse_args()
@@ -53,10 +62,23 @@ def main() -> int:
 
     variator_service = VariatorI2CService(
         bus_id=args.i2c_bus,
-        address=args.i2c_addr,
+        address=args.variator_addr,
         parent=app,
     )
+    charger_service = ChargerI2CService(
+        bus_id=args.i2c_bus,
+        address=args.charger_addr,
+        parent=app,
+    )
+    borne_service = BorneI2CService(
+        bus_id=args.i2c_bus,
+        address=args.borne_addr,
+        parent=app,
+    )
+
     store.variator_service = variator_service
+    store.charger_service = charger_service
+    store.borne_service = borne_service
 
     store.request_charge_mosfet.connect(
         bms_service.request_set_charge_mosfet,
@@ -77,12 +99,15 @@ def main() -> int:
 
     bms_service.start()
     variator_service.start()
+    charger_service.start()
+    borne_service.start()
 
     def shutdown(*_sig_args):
-        try:
-            variator_service.stop()
-        except Exception:
-            pass
+        for svc in (borne_service, charger_service, variator_service):
+            try:
+                svc.stop()
+            except Exception:
+                pass
 
         try:
             bms_service.stop()

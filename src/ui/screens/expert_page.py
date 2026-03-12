@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from qtpy.QtCore import QEvent, Qt, Slot
 from qtpy.QtWidgets import (
-    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -14,6 +13,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from src.core.variator_i2c_service import VariatorI2CService
 from src.ui.components.battery_elements import BMSSummaryCard, BatteryIcon
 
 
@@ -172,6 +172,8 @@ class ExpertPage(QWidget):
         super().__init__(parent)
         self.store = store
         self.variator = getattr(store, "variator_service", None)
+        self.charger_service = getattr(store, "charger_service", None)
+        self.borne_service = getattr(store, "borne_service", None)
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
@@ -205,7 +207,7 @@ class ExpertPage(QWidget):
         self._variator_speed = 0.0
         self._variator_mode = 0
         self._variator_brake = False
-        self._selected_mode = 0
+        self._command_mode = VariatorI2CService.MODE_NEUTRAL
 
         self._borne_state = "OFFLINE"
         self._borne_current_limit = 0
@@ -282,7 +284,7 @@ class ExpertPage(QWidget):
         left_col.addWidget(self.card_bms, 4)
 
         self.variator_card, var_l = self._make_card("VARIATEUR I2C")
-        self.variator_card.setMinimumHeight(180)
+        self.variator_card.setMinimumHeight(182)
 
         row_top = QHBoxLayout()
         row_top.setSpacing(6)
@@ -291,19 +293,10 @@ class ExpertPage(QWidget):
         self.lbl_var_state.setObjectName("Value")
         self.lbl_var_state.setStyleSheet("font-size: 14px; font-weight: 700;")
         row_top.addWidget(self.lbl_var_state)
-
         row_top.addStretch(1)
-
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItem("MANUAL", 0)
-        self.mode_combo.addItem("AUTO", 1)
-        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        self.mode_combo.setFixedWidth(116)
-        self.mode_combo.setFixedHeight(20)
-        row_top.addWidget(self.mode_combo)
         var_l.addLayout(row_top)
 
-        self.lbl_var_hint = QLabel("Commande I2C : mode + vitesse cible")
+        self.lbl_var_hint = QLabel("Mode sélectionné depuis Drive")
         self.lbl_var_hint.setObjectName("Hint")
         self.lbl_var_hint.setStyleSheet("font-size: 9px;")
         var_l.addWidget(self.lbl_var_hint)
@@ -320,6 +313,8 @@ class ExpertPage(QWidget):
         row, self.val_var_speed = self._kv("Measured speed", "0.0 km/h")
         var_l.addLayout(row)
         row, self.val_var_brake = self._kv("Brake", "OFF")
+        var_l.addLayout(row)
+        row, self.val_var_command_mode = self._kv("Command mode", "NEUTRAL")
         var_l.addLayout(row)
         row, self.val_var_feedback_mode = self._kv("Reported mode", "MANUAL")
         var_l.addLayout(row)
@@ -670,8 +665,17 @@ class ExpertPage(QWidget):
             self.store.charger_leds_changed.connect(self._on_charger_leds)
 
         if self.variator is not None:
+            self._command_mode = self.variator.current_mode
+            self.slider_target.setValue(self.variator.current_target)
             self.variator.telemetry_received.connect(self._on_variator_telemetry)
             self.variator.connection_changed.connect(self._on_variator_connection)
+            self.variator.command_changed.connect(self._on_variator_command_changed)
+
+        if self.charger_service is not None:
+            self.charger_service.telemetry_changed.connect(self._on_charger_snapshot)
+
+        if self.borne_service is not None:
+            self.borne_service.telemetry_changed.connect(self._on_borne_snapshot)
 
     def _recalc_powers(self) -> None:
         self._power_kw = (self._vpack * self._current) / 1000.0
@@ -709,6 +713,13 @@ class ExpertPage(QWidget):
         if on:
             return "READY"
         return "OFF"
+
+    def _mode_name(self, mode: int) -> str:
+        if mode == VariatorI2CService.MODE_MANUAL:
+            return "MANUAL"
+        if mode == VariatorI2CService.MODE_AUTO:
+            return "AUTO"
+        return "NEUTRAL"
 
     def _refresh_bms_card(self) -> None:
         self.card_bms.update_data(self._vpack, self._delta, self._vmin, self._vmax)
@@ -780,33 +791,20 @@ class ExpertPage(QWidget):
         self.ov_charger_source.setText(source)
         self.ov_charger_stage.setText(stage)
 
-    def _current_mode_value(self) -> int:
-        return self._selected_mode
-
-    def _apply_mode_ui_state(self) -> None:
-        auto_mode = self._selected_mode == 1
-        self.slider_target.setEnabled(auto_mode)
-        if auto_mode:
-            self.lbl_var_hint.setText(
-                "Commande I2C : mode + vitesse cible" if self._variator_connected else "Attente liaison I2C"
-            )
-        else:
-            self.lbl_var_hint.setText(
-                "Mode manuel : slider désactivé" if self._variator_connected else "Mode manuel : attente liaison I2C"
-            )
-
-    def _send_variator_command(self):
-        if self.variator is None:
-            return
-        self.variator.set_command(self._current_mode_value(), int(self.slider_target.value()))
-
     def _refresh_variator_card(self) -> None:
         self.lbl_var_state.setText("ONLINE" if self._variator_connected else "OFFLINE")
         self.val_var_target.setText(f"{self.slider_target.value()} km/h")
         self.val_var_speed.setText(f"{self._variator_speed:.1f} km/h")
         self.val_var_brake.setText("ON" if self._variator_brake else "OFF")
-        self.val_var_feedback_mode.setText("AUTO" if self._variator_mode == 1 else "MANUAL")
-        self._apply_mode_ui_state()
+        self.val_var_feedback_mode.setText(self._mode_name(self._variator_mode))
+        self.val_var_command_mode.setText(self._mode_name(self._command_mode))
+
+        auto_mode = self._command_mode == VariatorI2CService.MODE_AUTO
+        self.slider_target.setEnabled(auto_mode)
+        if auto_mode:
+            self.lbl_var_hint.setText("Mode AUTO depuis Drive : réglage vitesse actif")
+        else:
+            self.lbl_var_hint.setText("Mode sélectionné depuis Drive : slider inactif")
 
     def _refresh_borne_card(self) -> None:
         self.lbl_borne_state.setText(self._borne_state)
@@ -820,14 +818,18 @@ class ExpertPage(QWidget):
         self.val_borne_cpok.setText("YES" if self._borne_cp_ok else "NO")
 
     @Slot(int)
-    def _on_slider_changed(self, _value: int):
-        self._send_variator_command()
+    def _on_slider_changed(self, value: int):
+        if self.variator is not None:
+            self.variator.set_command(self._command_mode, int(value))
         self._refresh_variator_card()
 
-    @Slot(int)
-    def _on_mode_changed(self, index: int):
-        self._selected_mode = int(self.mode_combo.itemData(index))
-        self._send_variator_command()
+    @Slot(int, int)
+    def _on_variator_command_changed(self, mode: int, target: int):
+        self._command_mode = int(mode)
+        if self.slider_target.value() != int(target):
+            self.slider_target.blockSignals(True)
+            self.slider_target.setValue(int(target))
+            self.slider_target.blockSignals(False)
         self._refresh_variator_card()
 
     @Slot(float)
@@ -945,3 +947,27 @@ class ExpertPage(QWidget):
     def _on_variator_connection(self, connected: bool):
         self._variator_connected = bool(connected)
         self._refresh_variator_card()
+
+    @Slot(object)
+    def _on_charger_snapshot(self, data):
+        if isinstance(data, dict):
+            self._charger_connected = data.get("state", "OFFLINE") != "OFFLINE"
+            self.lbl_charger_state.setText(str(data.get("state", "OFFLINE")))
+            self.lbl_charger_hint.setText(f"Stage: {data.get('stage', 'OFF')}")
+            self.val_charge_vbat.setText(f"{float(data.get('voltage', 0.0)):.1f} V")
+            self.val_charge_ibat.setText(f"{float(data.get('current', 0.0)):.1f} A")
+            self.val_charge_p.setText(f"{float(data.get('power_kw', 0.0)):.2f} kW")
+
+    @Slot(object)
+    def _on_borne_snapshot(self, data):
+        if isinstance(data, dict):
+            self._borne_state = str(data.get("state", "OFFLINE"))
+            self._borne_current_limit = int(data.get("current_limit", 0))
+            self._borne_cable_limit = int(data.get("cable_limit", 0))
+            self._borne_cp_duty = float(data.get("cp_duty", 0.0))
+            self._borne_cp_freq = float(data.get("cp_freq", 0.0))
+            self._borne_cp_neg = float(data.get("cp_neg", -12.0))
+            self._borne_pp_voltage = float(data.get("pp_voltage", 0.0))
+            self._borne_sector_present = bool(data.get("sector_present", False))
+            self._borne_cp_ok = bool(data.get("cp_ok", False))
+            self._refresh_borne_card()

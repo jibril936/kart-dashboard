@@ -6,17 +6,26 @@ from qtpy.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QVBoxLayou
 
 
 class CircularBatteryWidget(QWidget):
-    """
-    Widget SOC circulaire (utilisé par ClusterPage).
-    """
-
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(220, 220)
+        self.setFixedSize(220, 240)
         self._soc = 0
+        self._secondary = ""
+        self._status = "EMPTY"
 
     def update_status(self, soc: int) -> None:
         self._soc = max(0, min(100, int(soc)))
+
+        if self._soc <= 10:
+            self._status = "EMPTY"
+        elif self._soc <= 25:
+            self._status = "LOW"
+        elif self._soc <= 85:
+            self._status = "NORMAL"
+        else:
+            self._status = "FULL"
+
+        self._secondary = f"{self._status}"
         self.update()
 
     def paintEvent(self, event):
@@ -24,37 +33,53 @@ class CircularBatteryWidget(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = self.rect()
-        cy = rect.center().y()
+        circle_rect = QRect(20, 22, 180, 180)
+        center_rect = QRect(0, 46, rect.width(), 92)
 
+        # fond anneau
         p.setPen(QPen(QColor(30, 30, 30), 14))
-        p.drawArc(20, 20, 180, 180, 0, 360 * 16)
+        p.drawArc(circle_rect, 0, 360 * 16)
 
+        # graduations fines
+        p.save()
+        p.translate(circle_rect.center())
+        for i in range(20):
+            p.save()
+            p.rotate(i * 18)
+            p.setPen(QPen(QColor(55, 55, 55), 1))
+            p.drawLine(0, -92, 0, -84)
+            p.restore()
+        p.restore()
+
+        # couleur dynamique
         if self._soc <= 15:
-            color = QColor(255, 40, 40)
+            color = QColor(255, 60, 60)
         elif self._soc <= 35:
-            color = QColor(255, 140, 0)
+            color = QColor(255, 170, 0)
         else:
             color = QColor(0, 255, 150)
 
         p.setPen(QPen(color, 14, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         span = int((self._soc / 100.0) * 360.0 * 16)
-        p.drawArc(20, 20, 180, 180, 90 * 16, -span)
+        p.drawArc(circle_rect, 90 * 16, -span)
 
+        # texte principal
         p.setPen(QColor(255, 255, 255))
-        p.setFont(QFont("Orbitron", 48, QFont.Weight.Bold))
-        p.drawText(rect, Qt.AlignmentFlag.AlignCenter, f"{self._soc}%")
+        p.setFont(QFont("Orbitron", 42, QFont.Weight.Bold))
+        p.drawText(center_rect, Qt.AlignmentFlag.AlignCenter, f"{self._soc}%")
 
-        p.setPen(QColor(140, 140, 140))
+        # label SOC
+        p.setPen(QColor(150, 150, 150))
         p.setFont(QFont("Orbitron", 10))
-        p.drawText(QRect(0, cy + 45, rect.width(), 20), Qt.AlignmentFlag.AlignCenter, "SOC")
+        p.drawText(QRect(0, 146, rect.width(), 18), Qt.AlignmentFlag.AlignCenter, "SOC")
+
+        # état secondaire
+        p.setPen(color)
+        p.setFont(QFont("Orbitron", 9, QFont.Weight.Bold))
+        p.drawText(QRect(0, 168, rect.width(), 18), Qt.AlignmentFlag.AlignCenter, self._secondary)
 
 
 class BMSSummaryCard(QFrame):
-    """
-    Carte "BMS HEALTH" cliquable.
-    Affiche Vpack + stats cellules.
-    """
-
     clicked = Signal()
 
     def __init__(self, parent=None):
@@ -73,7 +98,7 @@ class BMSSummaryCard(QFrame):
 
         self.lbl_vpack = QLabel("0.0 V")
         self.lbl_vpack.setObjectName("ValueBig")
-        self.lbl_vpack.setStyleSheet("font-size: 24px; font-weight: 700;")
+        self.lbl_vpack.setStyleSheet("font-size: 22px; font-weight: 700;")
         layout.addWidget(self.lbl_vpack)
 
         self.lbl_delta = QLabel("ΔV: 0.000 V")
@@ -152,22 +177,6 @@ class BMSSummaryCard(QFrame):
 
 
 class BatteryIcon(QWidget):
-    """
-    BatteryIcon cellule COMPACT (Overlay)
-
-    - Hauteur ~58px max
-    - Numéro cellule à GAUCHE de la barre
-    - Barre plus basse
-    - Voltage en dessous (petit)
-
-    Tension: 2.50V -> 3.65V
-    Couleurs:
-    Rouge : V<3.0V ou V>3.6V
-    Orange : 3.0V-3.2V
-    Vert : 3.2V-3.45V
-    Bleu : >3.45V
-    """
-
     V_MIN = 2.50
     V_MAX = 3.65
 

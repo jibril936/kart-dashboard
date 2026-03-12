@@ -11,9 +11,14 @@ except Exception:
 
 
 class VariatorI2CService(QObject):
-    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, mode, frein
+    MODE_MANUAL = 0
+    MODE_AUTO = 1
+    MODE_NEUTRAL = 2
+
+    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, reported_mode, frein
     connection_changed = Signal(bool)
     error_changed = Signal(str)
+    command_changed = Signal(int, int)              # commanded_mode, target_speed
 
     def __init__(self, bus_id: int = 1, address: int = 0x22, period_ms: int = 50, parent=None):
         super().__init__(parent)
@@ -25,11 +30,19 @@ class VariatorI2CService(QObject):
         self._connected = False
         self._last_error = ""
 
-        self._mode = 0
+        self._mode = self.MODE_NEUTRAL
         self._target_speed = 0
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._poll)
+
+    @property
+    def current_mode(self) -> int:
+        return int(self._mode)
+
+    @property
+    def current_target(self) -> int:
+        return int(self._target_speed)
 
     def start(self):
         if SMBus is None or i2c_msg is None:
@@ -42,6 +55,7 @@ class VariatorI2CService(QObject):
             self._set_connected(True)
             self._set_error("")
             self._timer.start(self.period_ms)
+            self.command_changed.emit(self._mode, self._target_speed)
         except Exception as exc:
             self._bus = None
             self._set_connected(False)
@@ -58,8 +72,22 @@ class VariatorI2CService(QObject):
         self._set_connected(False)
 
     def set_command(self, mode: int, target_speed: int):
-        self._mode = 1 if int(mode) else 0
-        self._target_speed = max(0, min(255, int(target_speed)))
+        try:
+            mode = int(mode)
+        except Exception:
+            mode = self.MODE_NEUTRAL
+
+        if mode not in (self.MODE_MANUAL, self.MODE_AUTO, self.MODE_NEUTRAL):
+            mode = self.MODE_NEUTRAL
+
+        target_speed = max(0, min(255, int(target_speed)))
+
+        changed = (mode != self._mode) or (target_speed != self._target_speed)
+        self._mode = mode
+        self._target_speed = target_speed
+
+        if changed:
+            self.command_changed.emit(self._mode, self._target_speed)
 
     def _set_connected(self, state: bool):
         state = bool(state)
@@ -84,7 +112,7 @@ class VariatorI2CService(QObject):
 
             time.sleep(0.001)
 
-            # ATmega -> Pi : float vitesse + uint8 mode + uint8 frein
+            # ATmega -> Pi : [float vitesse][uint8 mode][uint8 frein]
             read_msg = i2c_msg.read(self.address, 6)
             self._bus.i2c_rdwr(read_msg)
             raw = bytes(read_msg)
@@ -93,8 +121,6 @@ class VariatorI2CService(QObject):
                 raise ValueError(f"taille télémétrie invalide: {len(raw)}")
 
             vitesse, mode, frein = struct.unpack("<fBB", raw)
-
-            print(f"I2C RX -> vitesse={vitesse:.2f}, mode={mode}, frein={frein}")
 
             self._set_connected(True)
             self._set_error("")
