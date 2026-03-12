@@ -23,14 +23,14 @@ class Lamp(QFrame):
         self._on = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(34)
+        self.setFixedHeight(30)
         self.setObjectName("StatusLamp")
         if kind:
             self.setProperty("kind", kind)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(6)
 
         self.dot = QLabel("●")
         self.dot.setObjectName("LampDot")
@@ -38,12 +38,13 @@ class Lamp(QFrame):
 
         self.lbl_title = QLabel(title)
         self.lbl_title.setObjectName("LampLabel")
+        self.lbl_title.setStyleSheet("font-size: 11px;")
         layout.addWidget(self.lbl_title)
 
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedSize(52, 22)
+        self.badge.setFixedSize(48, 20)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setObjectName("LampBadge")
         layout.addWidget(self.badge)
@@ -65,16 +66,17 @@ class Lamp(QFrame):
             badge_fg = "#8a8a8a"
             border = "#3a3a3a"
 
-        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 18px;")
+        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 15px;")
         self.badge.setStyleSheet(
             f"""
             QLabel {{
                 background-color: {badge_bg};
                 color: {badge_fg};
                 border: 1px solid {border};
-                border-radius: 6px;
+                border-radius: 5px;
                 font-weight: 700;
-                padding: 0 4px;
+                font-size: 10px;
+                padding: 0 3px;
             }}
             """
         )
@@ -96,23 +98,24 @@ class LedPill(QFrame):
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("StatusLamp")
-        self.setFixedHeight(32)
+        self.setFixedHeight(24)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(5)
 
         self.dot = QLabel("●")
         layout.addWidget(self.dot)
 
         self.lbl_title = QLabel(title)
         self.lbl_title.setObjectName("LampLabel")
+        self.lbl_title.setStyleSheet("font-size: 10px;")
         layout.addWidget(self.lbl_title)
 
         layout.addStretch(1)
 
         self.badge = QLabel("OFF")
-        self.badge.setFixedSize(54, 20)
+        self.badge.setFixedSize(42, 16)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.badge)
 
@@ -146,17 +149,17 @@ class LedPill(QFrame):
             border = "#8b6914"
 
         self.badge.setText(text)
-        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 16px;")
+        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 13px;")
         self.badge.setStyleSheet(
             f"""
             QLabel {{
                 background-color: {badge_bg};
                 color: {badge_fg};
                 border: 1px solid {border};
-                border-radius: 6px;
-                font-size: 11px;
+                border-radius: 4px;
+                font-size: 9px;
                 font-weight: 700;
-                padding: 0 4px;
+                padding: 0 2px;
             }}
             """
         )
@@ -235,11 +238,12 @@ class ExpertPage(QWidget):
         card.setObjectName("Card")
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(12, 10, 12, 10)
-        v.setSpacing(8)
+        v.setContentsMargins(10, 8, 10, 8)
+        v.setSpacing(6)
 
         t = QLabel(title)
         t.setObjectName("CardTitle")
+        t.setStyleSheet("font-size: 11px;")
         v.addWidget(t)
 
         return card, v
@@ -247,17 +251,17 @@ class ExpertPage(QWidget):
     def _kv(self, key: str, initial: str = "--") -> tuple[QHBoxLayout, QLabel]:
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(8)
+        row.setSpacing(6)
 
         k = QLabel(key)
         k.setObjectName("Muted")
-        k.setStyleSheet("font-size: 11px;")
+        k.setStyleSheet("font-size: 10px;")
 
         val = QLabel(initial)
         val.setObjectName("Value")
         val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        val.setMinimumWidth(90)
-        val.setStyleSheet("font-size: 12px;")
+        val.setMinimumWidth(82)
+        val.setStyleSheet("font-size: 11px;")
 
         row.addWidget(k)
         row.addStretch(1)
@@ -266,30 +270,30 @@ class ExpertPage(QWidget):
 
     def _build_main(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(12, 10, 12, 10)
+        root.setSpacing(8)
 
         main_cols = QHBoxLayout()
         main_cols.setSpacing(10)
 
-        # COLONNE GAUCHE : BMS + VARIATEUR
+        # COLONNE GAUCHE
         left_col = QVBoxLayout()
-        left_col.setSpacing(10)
+        left_col.setSpacing(8)
 
         self.card_bms = BMSSummaryCard(self)
         self.card_bms.clicked.connect(self.show_overlay)
-        self.card_bms.setMinimumHeight(180)
+        self.card_bms.setMinimumHeight(170)
         left_col.addWidget(self.card_bms, 4)
 
         self.variator_card, var_l = self._make_card("VARIATEUR I2C")
-        self.variator_card.setMinimumHeight(220)
+        self.variator_card.setMinimumHeight(190)
 
         row_top = QHBoxLayout()
         row_top.setSpacing(8)
 
         self.lbl_var_state = QLabel("OFFLINE")
         self.lbl_var_state.setObjectName("Value")
-        self.lbl_var_state.setStyleSheet("font-size: 18px; font-weight: 700;")
+        self.lbl_var_state.setStyleSheet("font-size: 14px; font-weight: 700;")
         row_top.addWidget(self.lbl_var_state)
 
         row_top.addStretch(1)
@@ -298,19 +302,21 @@ class ExpertPage(QWidget):
         self.mode_combo.addItem("MANUAL", 0)
         self.mode_combo.addItem("AUTO", 1)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        self.mode_combo.setFixedWidth(120)
+        self.mode_combo.setFixedWidth(118)
+        self.mode_combo.setFixedHeight(22)
         row_top.addWidget(self.mode_combo)
         var_l.addLayout(row_top)
 
         self.lbl_var_hint = QLabel("Commande I2C : mode + vitesse cible")
         self.lbl_var_hint.setObjectName("Hint")
-        self.lbl_var_hint.setStyleSheet("font-size: 11px;")
+        self.lbl_var_hint.setStyleSheet("font-size: 10px;")
         var_l.addWidget(self.lbl_var_hint)
 
         self.slider_target = QSlider(Qt.Orientation.Horizontal)
         self.slider_target.setRange(0, 60)
         self.slider_target.setValue(0)
         self.slider_target.valueChanged.connect(self._on_slider_changed)
+        self.slider_target.setFixedHeight(18)
         var_l.addWidget(self.slider_target)
 
         row, self.val_var_target = self._kv("Target", "0 km/h")
@@ -324,28 +330,28 @@ class ExpertPage(QWidget):
 
         left_col.addWidget(self.variator_card, 5)
 
-        # COLONNE DROITE : CHARGEUR + BORNE
+        # COLONNE DROITE
         right_col = QVBoxLayout()
-        right_col.setSpacing(10)
+        right_col.setSpacing(8)
 
         self.charger_card, charger_l = self._make_card("CHARGEUR")
-        self.charger_card.setMinimumHeight(250)
+        self.charger_card.setMinimumHeight(220)
 
         self.lbl_charger_state = QLabel("OFFLINE")
         self.lbl_charger_state.setObjectName("Value")
         self.lbl_charger_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_charger_state.setStyleSheet("font-size: 22px; font-weight: 700;")
+        self.lbl_charger_state.setStyleSheet("font-size: 16px; font-weight: 700;")
         charger_l.addWidget(self.lbl_charger_state)
 
         self.lbl_charger_hint = QLabel("Stage: OFF")
         self.lbl_charger_hint.setObjectName("Hint")
-        self.lbl_charger_hint.setStyleSheet("font-size: 12px;")
+        self.lbl_charger_hint.setStyleSheet("font-size: 10px;")
         charger_l.addWidget(self.lbl_charger_hint)
 
         led_grid = QGridLayout()
-        led_grid.setContentsMargins(0, 6, 0, 6)
-        led_grid.setHorizontalSpacing(8)
-        led_grid.setVerticalSpacing(8)
+        led_grid.setContentsMargins(0, 3, 0, 3)
+        led_grid.setHorizontalSpacing(6)
+        led_grid.setVerticalSpacing(4)
 
         self.led_on = LedPill("ON")
         self.led_boost = LedPill("BOOST")
@@ -372,22 +378,22 @@ class ExpertPage(QWidget):
         right_col.addWidget(self.charger_card, 6)
 
         self.borne_card, borne_l = self._make_card("BORNE")
-        self.borne_card.setMinimumHeight(200)
+        self.borne_card.setMinimumHeight(180)
 
         self.lbl_borne_state = QLabel("OFFLINE")
         self.lbl_borne_state.setObjectName("Value")
-        self.lbl_borne_state.setStyleSheet("font-size: 18px; font-weight: 700;")
+        self.lbl_borne_state.setStyleSheet("font-size: 14px; font-weight: 700;")
         borne_l.addWidget(self.lbl_borne_state)
 
         self.lbl_borne_hint = QLabel("Préparé pour intégration I2C borne")
         self.lbl_borne_hint.setObjectName("Hint")
-        self.lbl_borne_hint.setStyleSheet("font-size: 11px;")
+        self.lbl_borne_hint.setStyleSheet("font-size: 10px;")
         borne_l.addWidget(self.lbl_borne_hint)
 
         borne_grid = QGridLayout()
-        borne_grid.setContentsMargins(0, 4, 0, 0)
-        borne_grid.setHorizontalSpacing(16)
-        borne_grid.setVerticalSpacing(6)
+        borne_grid.setContentsMargins(0, 3, 0, 0)
+        borne_grid.setHorizontalSpacing(12)
+        borne_grid.setVerticalSpacing(4)
 
         labels = [
             ("Current limit", "0 A"),
@@ -404,12 +410,12 @@ class ExpertPage(QWidget):
         for i, (k_text, v_text) in enumerate(labels):
             key = QLabel(k_text)
             key.setObjectName("Muted")
-            key.setStyleSheet("font-size: 11px;")
+            key.setStyleSheet("font-size: 10px;")
 
             val = QLabel(v_text)
             val.setObjectName("Value")
             val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            val.setStyleSheet("font-size: 12px;")
+            val.setStyleSheet("font-size: 11px;")
 
             r = i % 4
             c = 0 if i < 4 else 2
@@ -438,7 +444,7 @@ class ExpertPage(QWidget):
 
         hint = QLabel("BMS Health ouvre toutes les données BMS, y compris l’état MOSFET.")
         hint.setObjectName("Hint")
-        hint.setStyleSheet("font-size: 11px;")
+        hint.setStyleSheet("font-size: 10px;")
         root.addWidget(hint)
 
         root.addStretch(1)
@@ -456,7 +462,7 @@ class ExpertPage(QWidget):
         header = QFrame(self.overlay)
         header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         header.setObjectName("Card")
-        header.setFixedHeight(40)
+        header.setFixedHeight(38)
 
         hl = QHBoxLayout(header)
         hl.setContentsMargins(12, 6, 12, 6)
@@ -468,7 +474,7 @@ class ExpertPage(QWidget):
         hl.addStretch(1)
 
         self.btn_close = QPushButton("CLOSE")
-        self.btn_close.setFixedSize(90, 28)
+        self.btn_close.setFixedSize(88, 26)
         self.btn_close.clicked.connect(self.hide_overlay)
         hl.addWidget(self.btn_close)
 
@@ -484,7 +490,7 @@ class ExpertPage(QWidget):
         content.setSpacing(10)
 
         left_col = QVBoxLayout()
-        left_col.setSpacing(10)
+        left_col.setSpacing(8)
 
         summary_card, summary_l = self._make_card("SUMMARY")
         row, self.ov_soc = self._kv("SOC", "-- %")
@@ -524,12 +530,12 @@ class ExpertPage(QWidget):
         btn_row.setSpacing(8)
 
         self.btn_charge_toggle = QPushButton()
-        self.btn_charge_toggle.setFixedHeight(32)
+        self.btn_charge_toggle.setFixedHeight(30)
         self.btn_charge_toggle.clicked.connect(self._toggle_charge_mos)
         btn_row.addWidget(self.btn_charge_toggle)
 
         self.btn_discharge_toggle = QPushButton()
-        self.btn_discharge_toggle.setFixedHeight(32)
+        self.btn_discharge_toggle.setFixedHeight(30)
         self.btn_discharge_toggle.setProperty("variant", "danger")
         self.btn_discharge_toggle.clicked.connect(self._toggle_discharge_mos)
         btn_row.addWidget(self.btn_discharge_toggle)
@@ -541,7 +547,7 @@ class ExpertPage(QWidget):
         content.addLayout(left_col, 1)
 
         center_col = QVBoxLayout()
-        center_col.setSpacing(10)
+        center_col.setSpacing(8)
 
         cells_card, cells_l = self._make_card("CELL VOLTAGES")
         grid = QGridLayout()
@@ -571,7 +577,7 @@ class ExpertPage(QWidget):
         content.addLayout(center_col, 2)
 
         right_col = QVBoxLayout()
-        right_col.setSpacing(10)
+        right_col.setSpacing(8)
 
         diag_card, diag_l = self._make_card("DIAGNOSTICS")
         self.lbl_mask = QLabel("STATUS: 0x0000")
