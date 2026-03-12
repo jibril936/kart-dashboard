@@ -13,7 +13,7 @@ from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
 from src.core.state_store import StateStore
 from src.core.variator_i2c_service import VariatorI2CService
 from src.main_window import MainWindow
-
+from src.core.charger_i2c_service import ChargerI2CService
 
 def main() -> int:
     parser = argparse.ArgumentParser(
