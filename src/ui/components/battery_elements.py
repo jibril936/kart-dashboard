@@ -59,14 +59,13 @@ class BMSSummaryCard(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.setFixedSize(320, 240)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("Card")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(10)
+        layout.setSpacing(9)
 
         title = QLabel("BMS HEALTH")
         title.setObjectName("CardTitle")
@@ -74,10 +73,12 @@ class BMSSummaryCard(QFrame):
 
         self.lbl_vpack = QLabel("0.0 V")
         self.lbl_vpack.setObjectName("ValueBig")
+        self.lbl_vpack.setStyleSheet("font-size: 24px; font-weight: 700;")
         layout.addWidget(self.lbl_vpack)
 
         self.lbl_delta = QLabel("ΔV: 0.000 V")
         self.lbl_delta.setObjectName("ValueGood")
+        self.lbl_delta.setStyleSheet("font-size: 12px; font-weight: 700;")
         layout.addWidget(self.lbl_delta)
 
         self.min_bar = self._add_bar(layout, "MIN")
@@ -85,6 +86,7 @@ class BMSSummaryCard(QFrame):
 
         hint = QLabel("Tap to open FULL BMS CONTROL")
         hint.setObjectName("Hint")
+        hint.setStyleSheet("font-size: 10px;")
         layout.addWidget(hint)
 
         layout.addStretch(1)
@@ -95,7 +97,6 @@ class BMSSummaryCard(QFrame):
         w.update()
 
     def _set_delta_level(self, delta: float) -> None:
-        # seuils simples (à ajuster si besoin)
         if delta >= 0.150:
             name = "ValueBad"
         elif delta >= 0.080:
@@ -113,6 +114,7 @@ class BMSSummaryCard(QFrame):
 
         lbl = QLabel(name)
         lbl.setObjectName("Muted")
+        lbl.setStyleSheet("font-size: 10px;")
 
         bar = QProgressBar()
         bar.setFixedHeight(6)
@@ -121,11 +123,11 @@ class BMSSummaryCard(QFrame):
 
         val = QLabel("0.00V")
         val.setObjectName("Value")
+        val.setStyleSheet("font-size: 11px;")
 
         row.addWidget(lbl)
         row.addWidget(bar, 1)
         row.addWidget(val)
-
         layout.addLayout(row)
         return (bar, val)
 
@@ -152,6 +154,7 @@ class BMSSummaryCard(QFrame):
 class BatteryIcon(QWidget):
     """
     BatteryIcon cellule COMPACT (Overlay)
+
     - Hauteur ~58px max
     - Numéro cellule à GAUCHE de la barre
     - Barre plus basse
@@ -159,10 +162,10 @@ class BatteryIcon(QWidget):
 
     Tension: 2.50V -> 3.65V
     Couleurs:
-      Rouge : V<3.0V ou V>3.6V
-      Orange : 3.0V-3.2V
-      Vert : 3.2V-3.45V
-      Bleu : >3.45V
+    Rouge : V<3.0V ou V>3.6V
+    Orange : 3.0V-3.2V
+    Vert : 3.2V-3.45V
+    Bleu : >3.45V
     """
 
     V_MIN = 2.50
@@ -172,8 +175,6 @@ class BatteryIcon(QWidget):
         super().__init__(parent)
         self.cell_id = int(cell_id)
         self.voltage = 3.60
-
-        # Compact: height <= 60px
         self.setFixedSize(96, 58)
 
     def set_voltage(self, v: float) -> None:
@@ -196,7 +197,6 @@ class BatteryIcon(QWidget):
         w = self.width()
         h = self.height()
 
-        # Geometry compact
         id_w = 24
         bar_x = id_w + 6
         bar_y = 12
@@ -208,7 +208,6 @@ class BatteryIcon(QWidget):
         ratio = max(0.0, min(1.0, ratio))
         fill_w = int((bar_w - 4) * ratio)
 
-        # ID text on the left
         p.setPen(QColor(170, 170, 170))
         p.setFont(QFont("Orbitron", 8, QFont.Weight.Bold))
         p.drawText(
@@ -217,18 +216,15 @@ class BatteryIcon(QWidget):
             f"#{self.cell_id}",
         )
 
-        # Bar outline
         p.setPen(QPen(QColor(90, 90, 90), 1))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(bar_x, bar_y, bar_w, bar_h, 4, 4)
 
-        # Bar fill
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(self._color_for_voltage(v))
         if fill_w > 0:
             p.drawRoundedRect(bar_x + 2, bar_y + 2, fill_w, bar_h - 4, 3, 3)
 
-        # Voltage below
         p.setPen(QColor(245, 245, 245))
         p.setFont(QFont("Orbitron", 8))
         p.drawText(
