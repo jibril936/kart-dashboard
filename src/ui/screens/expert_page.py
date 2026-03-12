@@ -78,12 +78,7 @@ class Lamp(QFrame):
             }}
             """
         )
-
         self.update()
-
-    @property
-    def is_on(self) -> bool:
-        return self._on
 
 
 class AlertLamp(Lamp):
@@ -130,7 +125,6 @@ class LedPill(QFrame):
             state = 0
 
         state = 0 if state < 0 else 2 if state > 2 else state
-        self._state = state
 
         if state == 0:
             text = "OFF"
@@ -213,7 +207,6 @@ class ExpertPage(QWidget):
         self._variator_brake = False
         self._selected_mode = 0
 
-        # BORNE - placeholders UI prêts pour future com
         self._borne_state = "OFFLINE"
         self._borne_current_limit = 0
         self._borne_cable_limit = 0
@@ -231,8 +224,8 @@ class ExpertPage(QWidget):
         self._build_overlay()
         self._connect_signals()
         self._refresh_bms_card()
-        self._refresh_charger_card()
         self._refresh_bms_overlay()
+        self._refresh_charger_card()
         self._refresh_variator_card()
         self._refresh_borne_card()
 
@@ -243,7 +236,7 @@ class ExpertPage(QWidget):
 
         v = QVBoxLayout(card)
         v.setContentsMargins(12, 10, 12, 10)
-        v.setSpacing(6)
+        v.setSpacing(8)
 
         t = QLabel(title)
         t.setObjectName("CardTitle")
@@ -276,64 +269,20 @@ class ExpertPage(QWidget):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
-        # LIGNE 1 : BMS + CHARGEUR
-        top = QHBoxLayout()
-        top.setSpacing(10)
+        main_cols = QHBoxLayout()
+        main_cols.setSpacing(10)
+
+        # COLONNE GAUCHE : BMS + VARIATEUR
+        left_col = QVBoxLayout()
+        left_col.setSpacing(10)
 
         self.card_bms = BMSSummaryCard(self)
         self.card_bms.clicked.connect(self.show_overlay)
-        top.addWidget(self.card_bms, 4)
-
-        self.charger_card, charger_l = self._make_card("CHARGEUR")
-        self.charger_card.setMinimumWidth(440)
-
-        self.lbl_charger_state = QLabel("OFFLINE")
-        self.lbl_charger_state.setObjectName("Value")
-        self.lbl_charger_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_charger_state.setStyleSheet("font-size: 18px; font-weight: 700;")
-        charger_l.addWidget(self.lbl_charger_state)
-
-        self.lbl_charger_hint = QLabel("Stage: OFF")
-        self.lbl_charger_hint.setObjectName("Hint")
-        self.lbl_charger_hint.setStyleSheet("font-size: 11px;")
-        charger_l.addWidget(self.lbl_charger_hint)
-
-        led_grid = QGridLayout()
-        led_grid.setContentsMargins(0, 6, 0, 6)
-        led_grid.setHorizontalSpacing(8)
-        led_grid.setVerticalSpacing(8)
-
-        self.led_on = LedPill("ON")
-        self.led_boost = LedPill("BOOST")
-        self.led_equalize = LedPill("EQUALIZE")
-        self.led_float = LedPill("FLOAT")
-        self.led_failure = LedPill("FAILURE")
-
-        led_grid.addWidget(self.led_on, 0, 0)
-        led_grid.addWidget(self.led_boost, 0, 1)
-        led_grid.addWidget(self.led_equalize, 1, 0)
-        led_grid.addWidget(self.led_float, 1, 1)
-        led_grid.addWidget(self.led_failure, 2, 0, 1, 2)
-
-        charger_l.addLayout(led_grid)
-
-        row, self.val_charge_vbat = self._kv("Battery voltage", "--.- V")
-        charger_l.addLayout(row)
-        row, self.val_charge_ibat = self._kv("Battery current", "--.- A")
-        charger_l.addLayout(row)
-        row, self.val_charge_p = self._kv("Charge power", "--.- kW")
-        charger_l.addLayout(row)
-        row, self.val_charge_stage = self._kv("Stage", "--")
-        charger_l.addLayout(row)
-
-        top.addWidget(self.charger_card, 6)
-        root.addLayout(top)
-
-        # LIGNE 2 : VARIATEUR + BORNE
-        mid = QHBoxLayout()
-        mid.setSpacing(10)
+        self.card_bms.setMinimumHeight(180)
+        left_col.addWidget(self.card_bms, 4)
 
         self.variator_card, var_l = self._make_card("VARIATEUR I2C")
+        self.variator_card.setMinimumHeight(220)
 
         row_top = QHBoxLayout()
         row_top.setSpacing(8)
@@ -351,7 +300,6 @@ class ExpertPage(QWidget):
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         self.mode_combo.setFixedWidth(120)
         row_top.addWidget(self.mode_combo)
-
         var_l.addLayout(row_top)
 
         self.lbl_var_hint = QLabel("Commande I2C : mode + vitesse cible")
@@ -374,9 +322,57 @@ class ExpertPage(QWidget):
         row, self.val_var_feedback_mode = self._kv("Reported mode", "MANUAL")
         var_l.addLayout(row)
 
-        mid.addWidget(self.variator_card, 5)
+        left_col.addWidget(self.variator_card, 5)
+
+        # COLONNE DROITE : CHARGEUR + BORNE
+        right_col = QVBoxLayout()
+        right_col.setSpacing(10)
+
+        self.charger_card, charger_l = self._make_card("CHARGEUR")
+        self.charger_card.setMinimumHeight(250)
+
+        self.lbl_charger_state = QLabel("OFFLINE")
+        self.lbl_charger_state.setObjectName("Value")
+        self.lbl_charger_state.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_charger_state.setStyleSheet("font-size: 22px; font-weight: 700;")
+        charger_l.addWidget(self.lbl_charger_state)
+
+        self.lbl_charger_hint = QLabel("Stage: OFF")
+        self.lbl_charger_hint.setObjectName("Hint")
+        self.lbl_charger_hint.setStyleSheet("font-size: 12px;")
+        charger_l.addWidget(self.lbl_charger_hint)
+
+        led_grid = QGridLayout()
+        led_grid.setContentsMargins(0, 6, 0, 6)
+        led_grid.setHorizontalSpacing(8)
+        led_grid.setVerticalSpacing(8)
+
+        self.led_on = LedPill("ON")
+        self.led_boost = LedPill("BOOST")
+        self.led_equalize = LedPill("EQUALIZE")
+        self.led_float = LedPill("FLOAT")
+        self.led_failure = LedPill("FAILURE")
+
+        led_grid.addWidget(self.led_on, 0, 0)
+        led_grid.addWidget(self.led_boost, 0, 1)
+        led_grid.addWidget(self.led_equalize, 1, 0)
+        led_grid.addWidget(self.led_float, 1, 1)
+        led_grid.addWidget(self.led_failure, 2, 0, 1, 2)
+        charger_l.addLayout(led_grid)
+
+        row, self.val_charge_vbat = self._kv("Battery voltage", "--.- V")
+        charger_l.addLayout(row)
+        row, self.val_charge_ibat = self._kv("Battery current", "--.- A")
+        charger_l.addLayout(row)
+        row, self.val_charge_p = self._kv("Charge power", "--.- kW")
+        charger_l.addLayout(row)
+        row, self.val_charge_stage = self._kv("Stage", "--")
+        charger_l.addLayout(row)
+
+        right_col.addWidget(self.charger_card, 6)
 
         self.borne_card, borne_l = self._make_card("BORNE")
+        self.borne_card.setMinimumHeight(200)
 
         self.lbl_borne_state = QLabel("OFFLINE")
         self.lbl_borne_state.setObjectName("Value")
@@ -388,30 +384,63 @@ class ExpertPage(QWidget):
         self.lbl_borne_hint.setStyleSheet("font-size: 11px;")
         borne_l.addWidget(self.lbl_borne_hint)
 
-        row, self.val_borne_current = self._kv("Current limit", "0 A")
-        borne_l.addLayout(row)
-        row, self.val_borne_cable = self._kv("Cable limit", "0 A")
-        borne_l.addLayout(row)
-        row, self.val_borne_duty = self._kv("CP duty", "0.0 %")
-        borne_l.addLayout(row)
-        row, self.val_borne_freq = self._kv("CP frequency", "0.0 Hz")
-        borne_l.addLayout(row)
-        row, self.val_borne_cpneg = self._kv("CP-", "-12.0 V")
-        borne_l.addLayout(row)
-        row, self.val_borne_pp = self._kv("PP", "0.0 V")
-        borne_l.addLayout(row)
-        row, self.val_borne_sector = self._kv("Sector", "ABSENT")
-        borne_l.addLayout(row)
-        row, self.val_borne_cpok = self._kv("CP valid", "NO")
-        borne_l.addLayout(row)
+        borne_grid = QGridLayout()
+        borne_grid.setContentsMargins(0, 4, 0, 0)
+        borne_grid.setHorizontalSpacing(16)
+        borne_grid.setVerticalSpacing(6)
 
-        mid.addWidget(self.borne_card, 5)
-        root.addLayout(mid)
+        labels = [
+            ("Current limit", "0 A"),
+            ("Cable limit", "0 A"),
+            ("CP duty", "0.0 %"),
+            ("CP frequency", "0.0 Hz"),
+            ("CP-", "-12.0 V"),
+            ("PP", "0.00 V"),
+            ("Sector", "ABSENT"),
+            ("CP valid", "NO"),
+        ]
+
+        self._borne_value_labels = []
+        for i, (k_text, v_text) in enumerate(labels):
+            key = QLabel(k_text)
+            key.setObjectName("Muted")
+            key.setStyleSheet("font-size: 11px;")
+
+            val = QLabel(v_text)
+            val.setObjectName("Value")
+            val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            val.setStyleSheet("font-size: 12px;")
+
+            r = i % 4
+            c = 0 if i < 4 else 2
+            borne_grid.addWidget(key, r, c)
+            borne_grid.addWidget(val, r, c + 1)
+
+            self._borne_value_labels.append(val)
+
+        (
+            self.val_borne_current,
+            self.val_borne_cable,
+            self.val_borne_duty,
+            self.val_borne_freq,
+            self.val_borne_cpneg,
+            self.val_borne_pp,
+            self.val_borne_sector,
+            self.val_borne_cpok,
+        ) = self._borne_value_labels
+
+        borne_l.addLayout(borne_grid)
+        right_col.addWidget(self.borne_card, 4)
+
+        main_cols.addLayout(left_col, 4)
+        main_cols.addLayout(right_col, 6)
+        root.addLayout(main_cols)
 
         hint = QLabel("BMS Health ouvre toutes les données BMS, y compris l’état MOSFET.")
         hint.setObjectName("Hint")
         hint.setStyleSheet("font-size: 11px;")
         root.addWidget(hint)
+
         root.addStretch(1)
 
     def _build_overlay(self) -> None:
