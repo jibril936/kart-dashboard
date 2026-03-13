@@ -1,7 +1,5 @@
-import math
 import struct
 import time
-
 from qtpy.QtCore import QObject, QTimer, Signal
 
 try:
@@ -16,10 +14,10 @@ class VariatorI2CService(QObject):
     MODE_AUTO = 1
     MODE_NEUTRAL = 2
 
-    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, mode, frein
+    telemetry_received = Signal(float, int, bool)  # vitesse_kmh, mode, frein
     connection_changed = Signal(bool)
     error_changed = Signal(str)
-    command_changed = Signal(int, int)              # mode, target_speed
+    command_changed = Signal(int, int)  # mode, target_speed
 
     def __init__(self, bus_id: int = 1, address: int = 0x22, period_ms: int = 50, parent=None):
         super().__init__(parent)
@@ -30,7 +28,6 @@ class VariatorI2CService(QObject):
         self._bus = None
         self._connected = False
         self._last_error = ""
-
         self._mode = self.MODE_NEUTRAL
         self._target_speed = 0
 
@@ -66,13 +63,11 @@ class VariatorI2CService(QObject):
 
     def stop(self):
         self._timer.stop()
-
         if self._bus is not None:
             try:
                 self._bus.close()
             except Exception:
                 pass
-
         self._bus = None
         self._set_connected(False)
 
@@ -120,20 +115,18 @@ class VariatorI2CService(QObject):
             write_msg = i2c_msg.write(self.address, [self._mode, self._target_speed])
             self._bus.i2c_rdwr(write_msg)
 
-            time.sleep(0.001)
+            time.sleep(0.002)
 
-            # ATmega -> Pi : [float vitesse][uint8 mode][uint8 frein]
-            read_msg = i2c_msg.read(self.address, 6)
+            # ATmega -> Pi : [uint16 vitesse_x100][uint8 mode][uint8 frein]
+            read_msg = i2c_msg.read(self.address, 4)
             self._bus.i2c_rdwr(read_msg)
             raw = bytes(read_msg)
 
-            if len(raw) != 6:
+            if len(raw) != 4:
                 raise ValueError(f"taille télémétrie invalide: {len(raw)}")
 
-            vitesse, mode, frein = struct.unpack("<fBB", raw)
-
-            if not math.isfinite(vitesse):
-                raise ValueError("vitesse non finie")
+            vitesse_x100, mode, frein = struct.unpack("<HBB", raw)
+            vitesse = float(vitesse_x100) / 100.0
 
             if mode not in (self.MODE_MANUAL, self.MODE_AUTO, self.MODE_NEUTRAL):
                 raise ValueError(f"mode invalide: {mode}")
@@ -143,7 +136,7 @@ class VariatorI2CService(QObject):
 
             self._set_connected(True)
             self._set_error("")
-            self.telemetry_received.emit(float(vitesse), int(mode), bool(frein))
+            self.telemetry_received.emit(vitesse, int(mode), bool(frein))
 
         except Exception as exc:
             self._set_connected(False)
