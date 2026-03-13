@@ -13,39 +13,16 @@ from src.core.hardware_service import DEFAULT_BMS_PORT, HardwareService
 from src.core.state_store import StateStore
 from src.core.variator_i2c_service import VariatorI2CService
 from src.main_window import MainWindow
-from src.core.charger_i2c_service import ChargerI2CService
+
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Kart Dashboard (Raspberry Pi / PyQt6 / QtPy)"
-    )
+    parser = argparse.ArgumentParser(description="Kart Dashboard (Raspberry Pi / PyQt6 / QtPy)")
     parser.add_argument("--fs", "--fullscreen", action="store_true", help="Mode plein écran")
-    parser.add_argument(
-        "--port",
-        type=str,
-        default=DEFAULT_BMS_PORT,
-        help="Port série BMS (ex: /dev/ttyUSB0)",
-    )
+    parser.add_argument("--port", type=str, default=DEFAULT_BMS_PORT, help="Port série BMS")
     parser.add_argument("--i2c-bus", type=int, default=1, help="Bus I2C")
-    parser.add_argument(
-        "--variator-addr",
-        type=lambda x: int(x, 0),
-        default=0x22,
-        help="Adresse I2C variateur",
-    )
-    parser.add_argument(
-        "--charger-addr",
-        type=lambda x: int(x, 0),
-        default=0x24,
-        help="Adresse I2C chargeur",
-    )
-    parser.add_argument(
-        "--borne-addr",
-        type=lambda x: int(x, 0),
-        default=0x56,
-        help="Adresse I2C borne",
-    )
-
+    parser.add_argument("--variator-addr", type=lambda x: int(x, 0), default=0x22, help="Adresse I2C variateur")
+    parser.add_argument("--charger-addr", type=lambda x: int(x, 0), default=0x24, help="Adresse I2C chargeur")
+    parser.add_argument("--borne-addr", type=lambda x: int(x, 0), default=0x56, help="Adresse I2C borne")
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
@@ -58,6 +35,7 @@ def main() -> int:
         app.setOverrideCursor(Qt.CursorShape.BlankCursor)
 
     store = StateStore()
+
     bms_service = HardwareService(store, port=args.port)
 
     variator_service = VariatorI2CService(
@@ -79,6 +57,38 @@ def main() -> int:
     store.variator_service = variator_service
     store.charger_service = charger_service
     store.borne_service = borne_service
+
+    def on_variator_telemetry(vitesse_kmh: float, mode: int, frein: bool):
+        store.set_speed(float(vitesse_kmh))
+        store.set_brake_active(bool(frein))
+        store.set_system_ready(True)
+        store.set_is_limiting(mode == VariatorI2CService.MODE_NEUTRAL)
+
+    def on_variator_connection(connected: bool):
+        if not connected:
+            store.set_speed(0.0)
+            store.set_brake_active(False)
+            store.set_system_ready(False)
+            store.set_is_limiting(False)
+
+    def on_charger_snapshot(data):
+        if not isinstance(data, dict):
+            store.set_charger_connected(False)
+            store.set_charger_leds(on=0, boost=0, equalize=0, float_=0, failure=0)
+            return
+
+        store.set_charger_connected(bool(data.get("connected", False)))
+        store.set_charger_leds(
+            on=int(data.get("on", 0)),
+            boost=int(data.get("boost", 0)),
+            equalize=int(data.get("equalize", 0)),
+            float_=int(data.get("float", 0)),
+            failure=int(data.get("failure", 0)),
+        )
+
+    variator_service.telemetry_received.connect(on_variator_telemetry)
+    variator_service.connection_changed.connect(on_variator_connection)
+    charger_service.telemetry_changed.connect(on_charger_snapshot)
 
     store.request_charge_mosfet.connect(
         bms_service.request_set_charge_mosfet,

@@ -1,3 +1,4 @@
+import math
 import struct
 import time
 
@@ -15,16 +16,16 @@ class VariatorI2CService(QObject):
     MODE_AUTO = 1
     MODE_NEUTRAL = 2
 
-    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, reported_mode, frein
+    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, mode, frein
     connection_changed = Signal(bool)
     error_changed = Signal(str)
-    command_changed = Signal(int, int)              # commanded_mode, target_speed
+    command_changed = Signal(int, int)              # mode, target_speed
 
     def __init__(self, bus_id: int = 1, address: int = 0x22, period_ms: int = 50, parent=None):
         super().__init__(parent)
-        self.bus_id = bus_id
-        self.address = address
-        self.period_ms = period_ms
+        self.bus_id = int(bus_id)
+        self.address = int(address)
+        self.period_ms = int(period_ms)
 
         self._bus = None
         self._connected = False
@@ -38,16 +39,19 @@ class VariatorI2CService(QObject):
 
     @property
     def current_mode(self) -> int:
-        return int(self._mode)
+        return self._mode
 
     @property
     def current_target(self) -> int:
-        return int(self._target_speed)
+        return self._target_speed
 
     def start(self):
         if SMBus is None or i2c_msg is None:
-            self._set_error("smbus2 non installé")
             self._set_connected(False)
+            self._set_error("smbus2 non installé")
+            return
+
+        if self._bus is not None:
             return
 
         try:
@@ -55,7 +59,6 @@ class VariatorI2CService(QObject):
             self._set_connected(True)
             self._set_error("")
             self._timer.start(self.period_ms)
-            self.command_changed.emit(self._mode, self._target_speed)
         except Exception as exc:
             self._bus = None
             self._set_connected(False)
@@ -63,11 +66,13 @@ class VariatorI2CService(QObject):
 
     def stop(self):
         self._timer.stop()
+
         if self._bus is not None:
             try:
                 self._bus.close()
             except Exception:
                 pass
+
         self._bus = None
         self._set_connected(False)
 
@@ -80,7 +85,12 @@ class VariatorI2CService(QObject):
         if mode not in (self.MODE_MANUAL, self.MODE_AUTO, self.MODE_NEUTRAL):
             mode = self.MODE_NEUTRAL
 
-        target_speed = max(0, min(255, int(target_speed)))
+        try:
+            target_speed = int(target_speed)
+        except Exception:
+            target_speed = 0
+
+        target_speed = max(0, min(255, target_speed))
 
         changed = (mode != self._mode) or (target_speed != self._target_speed)
         self._mode = mode
@@ -122,6 +132,15 @@ class VariatorI2CService(QObject):
 
             vitesse, mode, frein = struct.unpack("<fBB", raw)
 
+            if not math.isfinite(vitesse):
+                raise ValueError("vitesse non finie")
+
+            if mode not in (self.MODE_MANUAL, self.MODE_AUTO, self.MODE_NEUTRAL):
+                raise ValueError(f"mode invalide: {mode}")
+
+            if vitesse < 0.0 or vitesse > 120.0:
+                raise ValueError(f"vitesse hors plage: {vitesse}")
+
             self._set_connected(True)
             self._set_error("")
             self.telemetry_received.emit(float(vitesse), int(mode), bool(frein))
@@ -129,3 +148,4 @@ class VariatorI2CService(QObject):
         except Exception as exc:
             self._set_connected(False)
             self._set_error(f"I2C poll failed: {exc}")
+            self.telemetry_received.emit(0.0, self._mode, False)
