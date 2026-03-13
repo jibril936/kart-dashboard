@@ -97,8 +97,7 @@ class ChargerI2CService(QObject):
         return 0 if v < 0 else 2 if v > 2 else v
 
     def _parse_frame(self, raw: bytes):
-        # Trame attendue :
-        # [on, boost, equalize, float, failure]
+        # Trame attendue : [on, boost, equalize, float, failure]
         if len(raw) != 5:
             raise ValueError(f"taille chargeur invalide: {len(raw)}")
 
@@ -107,7 +106,6 @@ class ChargerI2CService(QObject):
             raise ValueError(f"trame chargeur invalide: {vals}")
 
         on, boost, equalize, float_led, failure = vals
-
         connected = any(v > 0 for v in vals)
 
         return {
