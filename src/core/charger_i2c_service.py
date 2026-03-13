@@ -37,7 +37,7 @@ class ChargerI2CService(QObject):
 
         try:
             self._bus = SMBus(self.bus_id)
-            self._set_connected(True)
+            self._set_connected(False)
             self._set_error("")
             self._timer.start(self.period_ms)
             self.telemetry_changed.emit(self._offline_snapshot())
@@ -97,7 +97,8 @@ class ChargerI2CService(QObject):
         return 0 if v < 0 else 2 if v > 2 else v
 
     def _parse_frame(self, raw: bytes):
-        # Trame simple attendue : 5 octets [on, boost, equalize, float, failure]
+        # Trame attendue :
+        # [on, boost, equalize, float, failure]
         if len(raw) != 5:
             raise ValueError(f"taille chargeur invalide: {len(raw)}")
 
@@ -107,9 +108,11 @@ class ChargerI2CService(QObject):
 
         on, boost, equalize, float_led, failure = vals
 
+        connected = any(v > 0 for v in vals)
+
         return {
-            "connected": any(v > 0 for v in vals),
-            "state": "READY" if any(v > 0 for v in vals) else "OFFLINE",
+            "connected": connected,
+            "state": "READY" if connected else "OFFLINE",
             "stage": (
                 "FAULT" if failure else
                 "FLOAT" if float_led else
@@ -138,7 +141,8 @@ class ChargerI2CService(QObject):
             raw = bytes(msg)
 
             snap = self._parse_frame(raw)
-            self._set_connected(True)
+
+            self._set_connected(bool(snap["connected"]))
             self._set_error("")
             self.telemetry_changed.emit(snap)
 
