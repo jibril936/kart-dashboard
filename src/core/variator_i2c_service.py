@@ -14,10 +14,10 @@ class VariatorI2CService(QObject):
     MODE_AUTO = 1
     MODE_NEUTRAL = 2
 
-    telemetry_received = Signal(float, int, bool)
+    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, mode, frein
     connection_changed = Signal(bool)
     error_changed = Signal(str)
-    command_changed = Signal(int, int)
+    command_changed = Signal(int, int)              # mode, target_speed
 
     def __init__(self, bus_id: int = 1, address: int = 0x22, period_ms: int = 50, parent=None):
         super().__init__(parent)
@@ -112,11 +112,13 @@ class VariatorI2CService(QObject):
             return
 
         try:
+            # Pi -> ATmega : [mode, vitesseCible]
             write_msg = i2c_msg.write(self.address, [self._mode, self._target_speed])
             self._bus.i2c_rdwr(write_msg)
 
             time.sleep(0.002)
 
+            # ATmega -> Pi : [uint16 vitesse_x100][uint8 mode][uint8 frein]
             read_msg = i2c_msg.read(self.address, 4)
             self._bus.i2c_rdwr(read_msg)
             raw = bytes(read_msg)
