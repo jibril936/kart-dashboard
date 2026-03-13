@@ -289,7 +289,6 @@ class ClusterPage(QWidget):
 
     @Slot(float, int, bool)
     def _on_i2c_telemetry(self, vitesse_kmh: float, mode: int, frein: bool):
-        print(f"[I2C TELEMETRY] vitesse={vitesse_kmh:.2f} mode={mode} frein={frein}")
         self._speed_target = max(0.0, float(vitesse_kmh))
         self._i2c_brake = bool(frein)
         self._reported_mode = int(mode)

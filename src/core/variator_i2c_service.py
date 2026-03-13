@@ -14,10 +14,10 @@ class VariatorI2CService(QObject):
     MODE_AUTO = 1
     MODE_NEUTRAL = 2
 
-    telemetry_received = Signal(float, int, bool)   # vitesse_kmh, mode, frein
+    telemetry_received = Signal(float, int, bool)
     connection_changed = Signal(bool)
     error_changed = Signal(str)
-    command_changed = Signal(int, int)              # mode, target_speed
+    command_changed = Signal(int, int)
 
     def __init__(self, bus_id: int = 1, address: int = 0x22, period_ms: int = 50, parent=None):
         super().__init__(parent)
@@ -57,7 +57,6 @@ class VariatorI2CService(QObject):
             self._set_connected(True)
             self._set_error("")
             self._timer.start(self.period_ms)
-            print(f"[I2C] Bus ouvert bus_id={self.bus_id} addr=0x{self.address:02X}")
         except Exception as exc:
             self._bus = None
             self._set_connected(False)
@@ -107,27 +106,20 @@ class VariatorI2CService(QObject):
         if msg != self._last_error:
             self._last_error = msg
             self.error_changed.emit(msg)
-            if msg:
-                print(f"[I2C ERROR] {msg}")
 
     def _poll(self):
         if self._bus is None:
             return
 
         try:
-            # Envoi commande vers ATmega
             write_msg = i2c_msg.write(self.address, [self._mode, self._target_speed])
             self._bus.i2c_rdwr(write_msg)
 
             time.sleep(0.002)
 
-            # Lecture télémétrie 4 octets: <HBB
             read_msg = i2c_msg.read(self.address, 4)
             self._bus.i2c_rdwr(read_msg)
             raw = bytes(read_msg)
-
-            hex_dump = " ".join(f"{b:02X}" for b in raw)
-            print(f"[I2C BYTES] len={len(raw)} data={hex_dump}")
 
             if len(raw) != 4:
                 raise ValueError(f"taille télémétrie invalide: {len(raw)}")
@@ -140,8 +132,6 @@ class VariatorI2CService(QObject):
             if frein not in (0, 1):
                 raise ValueError(f"frein invalide: {frein}")
 
-            print(f"[I2C RAW OK] vitesse={vitesse:.2f} mode={mode} frein={bool(frein)}")
-
             self._set_connected(True)
             self._set_error("")
             self.telemetry_received.emit(vitesse, int(mode), bool(frein))
@@ -149,5 +139,4 @@ class VariatorI2CService(QObject):
         except Exception as exc:
             self._set_connected(False)
             self._set_error(f"I2C poll failed: {exc}")
-            print(f"[I2C ERROR] poll failed: {exc}")
             self.telemetry_received.emit(0.0, int(self._mode), False)
